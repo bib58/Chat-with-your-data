@@ -66,8 +66,17 @@ async def chat(request: ChatRequest):
             title=cfg.get("title", "")
         )
         
+    raw_answer = result.get("final_answer", "No answer generated.")
+    if isinstance(raw_answer, list):
+        answer_str = "\n".join(
+            part.get("text", str(part)) if isinstance(part, dict) else str(part)
+            for part in raw_answer
+        )
+    else:
+        answer_str = str(raw_answer)
+
     return ChatResponse(
-        answer=result.get("final_answer", "No answer generated."),
+        answer=answer_str,
         table_data=table_data,
         chart_config=chart_cfg,
         query_executed=result.get("pandas_code")

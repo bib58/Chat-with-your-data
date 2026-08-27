@@ -91,9 +91,9 @@ export default function ChatInterface({ dataset }) {
   };
 
   return (
-    <div className="flex-1 flex flex-col bg-slate-950 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 to-slate-950">
+    <div className="flex-1 flex flex-col min-h-0 h-full bg-slate-950 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 to-slate-950">
       
-      <header className="h-16 border-b border-slate-800/60 bg-slate-900/50 backdrop-blur-md flex items-center px-6 sticky top-0 z-10 justify-between">
+      <header className="h-16 shrink-0 border-b border-slate-800/60 bg-slate-900/50 backdrop-blur-md flex items-center px-6 sticky top-0 z-10 justify-between">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center">
             <Bot className="w-5 h-5 text-indigo-400" />
@@ -112,7 +112,7 @@ export default function ChatInterface({ dataset }) {
         </button>
       </header>
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-6">
+      <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-6 custom-scrollbar">
         {messages.map((msg, idx) => (
           <MessageBubble key={idx} message={msg} />
         ))}
