@@ -8,16 +8,21 @@ import os
 import json
 import traceback
 from dotenv import load_dotenv
+from sqlalchemy import create_engine
+import warnings
 
-# Load .env from current directory and backend directory
+# Suppress warnings from langchain_google_genai for clean terminal output
+warnings.filterwarnings("ignore", module="langchain_google_genai")
+
 load_dotenv()
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
 class GraphState(TypedDict):
     question: str
     dataset_path: str
+    db_uri: str
     df_info: str
-    pandas_code: str
+    sql_query: str
     execution_result: Any
     chart_needed: bool
     chart_config: Optional[Dict[str, Any]]
@@ -25,7 +30,7 @@ class GraphState(TypedDict):
     error: str
 
 class QueryGeneration(BaseModel):
-    pandas_code: str = Field(description="The pandas code to execute. The dataframe is available as 'df'. Assign the final result to a variable named 'result'.")
+    sql_query: str = Field(description="The SQLite query to execute. Do not include markdown formatting. The table name is 'data_table'.")
     chart_needed: bool = Field(description="True if the user's question is best answered with a chart/graph.")
 
 class ChartGeneration(BaseModel):
@@ -46,18 +51,33 @@ def get_llm():
 def analyze_dataset_node(state: GraphState):
     try:
         path = state["dataset_path"]
-        if path.endswith('.csv'):
-            df = pd.read_csv(path)
-        else:
-            df = pd.read_excel(path)
+        
+        # Create a temporary SQLite database in the same directory as the dataset
+        db_path = f"{path}.db"
+        db_uri = f"sqlite:///{db_path}"
+        engine = create_engine(db_uri)
+        
+        # Only parse the full CSV and write to SQL if the DB doesn't exist
+        if not os.path.exists(db_path):
+            if path.endswith('.csv'):
+                df = pd.read_csv(path)
+            else:
+                df = pd.read_excel(path)
+            df.to_sql("data_table", engine, index=False, if_exists="replace")
+        
+        # Fast extraction of schema and sample data using SQL
+        sample_df = pd.read_sql("SELECT * FROM data_table LIMIT 3", engine)
+        count_df = pd.read_sql("SELECT COUNT(*) as cnt FROM data_table", engine)
+        total_rows = count_df.iloc[0]['cnt']
         
         info = []
-        info.append(f"Columns: {', '.join(df.columns)}")
-        info.append(f"Shape: {df.shape[0]} rows, {df.shape[1]} columns")
-        info.append("Data Types:\n" + str(df.dtypes))
-        info.append("Sample Data (first 3 rows):\n" + df.head(3).to_string())
+        info.append(f"Table name: data_table")
+        info.append(f"Columns: {', '.join(sample_df.columns)}")
+        info.append(f"Shape: {total_rows} rows, {len(sample_df.columns)} columns")
+        info.append("Data Types:\n" + str(sample_df.dtypes))
+        info.append("Sample Data (first 3 rows):\n" + sample_df.to_string())
         
-        return {"df_info": "\n".join(info)}
+        return {"df_info": "\n".join(info), "db_uri": db_uri}
     except Exception as e:
         return {"error": f"Failed to analyze dataset: {str(e)}"}
 
@@ -67,13 +87,12 @@ def generate_query_node(state: GraphState):
     llm = get_llm().with_structured_output(QueryGeneration)
     
     system_prompt = (
-        "You are a Python Pandas expert. Write pandas code to answer the user's question.\n"
-        "The dataframe is already loaded as a variable named `df`.\n"
-        "You must assign the final output to a variable named `result`.\n"
-        "If the result is a dataframe, ensure it contains the necessary columns."
+        "You are an expert SQL analyst. Write a SQLite query to answer the user's question.\n"
+        "The data is available in a table named `data_table`.\n"
+        "Only generate the SQL query (no markdown block, just the query itself). Ensure the query is valid SQLite."
     )
     
-    user_prompt = f"""Dataset Info:
+    user_prompt = f"""Dataset Schema Info:
 {state.get('df_info', 'No dataset info')}
 
 User Question: {state['question']}"""
@@ -84,7 +103,7 @@ User Question: {state['question']}"""
             HumanMessage(content=user_prompt)
         ])
         return {
-            "pandas_code": response.pandas_code,
+            "sql_query": response.sql_query,
             "chart_needed": response.chart_needed
         }
     except Exception as e:
@@ -93,20 +112,15 @@ User Question: {state['question']}"""
 def execute_query_node(state: GraphState):
     if state.get("error"): return state
     
-    code = state["pandas_code"]
-    path = state["dataset_path"]
+    sql_query = state["sql_query"]
+    db_uri = state.get("db_uri")
+    
+    if not db_uri:
+        return {"error": "No database URI found."}
     
     try:
-        if path.endswith('.csv'):
-            df = pd.read_csv(path)
-        else:
-            df = pd.read_excel(path)
-            
-        local_vars = {"df": df, "pd": pd}
-        
-        exec(code, {}, local_vars)
-        
-        result = local_vars.get("result", "No 'result' variable was assigned in the code.")
+        engine = create_engine(db_uri)
+        result = pd.read_sql(sql_query, engine)
         
         if isinstance(result, pd.DataFrame):
             serializable_result = result.to_dict(orient='records')

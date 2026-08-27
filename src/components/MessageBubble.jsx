@@ -197,7 +197,7 @@ export default function MessageBubble({ message }) {
           <div className="group relative mt-1 bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-inner max-w-full overflow-x-auto w-full">
             <div className="flex items-center justify-between gap-2 text-xs font-mono text-slate-500 mb-2">
               <span className="flex items-center gap-1.5 uppercase tracking-wider text-slate-400">
-                <Code className="w-3.5 h-3.5 text-indigo-400" /> Generated Pandas Code
+                <Code className="w-3.5 h-3.5 text-indigo-400" /> Generated SQL Query
               </span>
               <button
                 onClick={handleCopyCode}

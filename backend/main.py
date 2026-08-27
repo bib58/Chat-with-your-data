@@ -26,7 +26,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-UPLOAD_DIR = "uploads"
+UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 @app.post("/upload")
@@ -79,5 +79,5 @@ async def chat(request: ChatRequest):
         answer=answer_str,
         table_data=table_data,
         chart_config=chart_cfg,
-        query_executed=result.get("pandas_code")
+        query_executed=result.get("sql_query")
     )
