@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+pandas
+langgraph
+langchain-google-genai
+langchain-experimental
+python-multipart
+reportlab
+python-dotenv
+openpyxl
