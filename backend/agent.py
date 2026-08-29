@@ -5,10 +5,6 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel, Field
 import os
-import traceback
-from dotenv import load_dotenv
-from sqlalchemy import create_engine
-import warnings
 import time
 
 # Suppress warnings from langchain_google_genai for clean terminal output
