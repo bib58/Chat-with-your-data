@@ -1,14 +1,35 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import ChatInterface from './components/ChatInterface';
 
 function App() {
   const [dataset, setDataset] = useState(null);
   
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (dataset && dataset.dataset_path) {
+        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+        fetch(`${API_URL}/cleanup`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ dataset_path: dataset.dataset_path }),
+          keepalive: true
+        }).catch(err => console.error("Cleanup failed:", err));
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [dataset]);
+  
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-slate-900 text-slate-100 font-sans selection:bg-indigo-500/30">
+    <div className="flex h-screen w-screen overflow-hidden bg-slate-900 text-slate-100 font-sans selection:bg-indigo-500/30 print:h-auto print:overflow-visible print:block">
       <Sidebar dataset={dataset} setDataset={setDataset} />
-      <div className="flex-1 flex flex-col relative h-full">
+      <div className="flex-1 flex flex-col relative h-full print:h-auto print:overflow-visible print:block">
         {dataset ? (
           <ChatInterface dataset={dataset} />
         ) : (

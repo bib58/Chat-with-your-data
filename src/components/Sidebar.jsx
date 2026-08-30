@@ -25,7 +25,8 @@ export default function Sidebar({ dataset, setDataset }) {
     setError('');
 
     try {
-      const response = await axios.post('http://localhost:8000/upload', formData, {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const response = await axios.post(`${API_URL}/upload`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       setDataset(response.data);
@@ -48,7 +49,8 @@ export default function Sidebar({ dataset, setDataset }) {
     setError('');
 
     try {
-      const response = await axios.post('http://localhost:8000/connect', {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const response = await axios.post(`${API_URL}/connect`, {
         connection_string: connectionString.trim()
       });
       setDataset(response.data);
@@ -61,7 +63,7 @@ export default function Sidebar({ dataset, setDataset }) {
   };
 
   return (
-    <div className="w-72 bg-slate-900 border-r border-slate-800 flex flex-col shadow-2xl z-20 relative">
+    <div className="w-72 bg-slate-900 border-r border-slate-800 flex flex-col shadow-2xl z-20 relative print:hidden">
       <div className="p-6 border-b border-slate-800">
         <h2 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-purple-400 flex items-center gap-2">
           <Database className="w-6 h-6 text-indigo-400" />

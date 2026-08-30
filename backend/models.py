@@ -11,7 +11,7 @@ class ConnectRequest(BaseModel):
     connection_string: str
 
 class ChartConfig(BaseModel):
-    type: str 
+    type: str
     xKey: str
     yKey: str
     title: str
@@ -21,3 +21,6 @@ class ChatResponse(BaseModel):
     table_data: Optional[List[Dict[str, Any]]] = None
     chart_config: Optional[ChartConfig] = None
     query_executed: Optional[str] = None
+
+class CleanupRequest(BaseModel):
+    dataset_path: str

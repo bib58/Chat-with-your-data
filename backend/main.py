@@ -10,10 +10,10 @@ from dotenv import load_dotenv
 load_dotenv()
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 try:
-    from .models import ChatRequest, ChatResponse, ChartConfig, ConnectRequest
+    from .models import ChatRequest, ChatResponse, ChartConfig, ConnectRequest, CleanupRequest
     from .agent import process_chat
 except ImportError:
-    from models import ChatRequest, ChatResponse, ChartConfig, ConnectRequest
+    from models import ChatRequest, ChatResponse, ChartConfig, ConnectRequest, CleanupRequest
     from agent import process_chat
 
 app = FastAPI()
@@ -40,6 +40,22 @@ async def upload_file(file: UploadFile = File(...)):
         shutil.copyfileobj(file.file, buffer)
         
     return {"dataset_path": file_path, "filename": file.filename}
+
+@app.post("/cleanup")
+async def cleanup_files(request: CleanupRequest):
+    path = request.dataset_path
+    if path and os.path.exists(path) and "uploads" in path:
+        try:
+            os.remove(path)
+        except Exception:
+            pass
+        db_path = f"{path}.db"
+        if os.path.exists(db_path):
+            try:
+                os.remove(db_path)
+            except Exception:
+                pass
+    return {"status": "ok"}
 
 @app.post("/connect")
 async def connect_database(request: ConnectRequest):

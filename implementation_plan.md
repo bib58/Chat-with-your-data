@@ -76,7 +76,7 @@ The backend will implement the exact state machine you requested:
 - Test LangGraph workflow locally with mock questions to ensure states transition correctly (Question -> Code Gen -> Execution -> Answer).
 
 ### Manual Verification
-- Start FastAPI backend (`uvicorn backend.main:app --reload`).
+- Start FastAPI backend (`uvicorn main:app --reload`).
 - Start Vite frontend (`npm run dev`).
 - Upload a sample dataset via the UI.
 - Ask questions requiring tabular data (e.g., "Show me the top 5 rows").

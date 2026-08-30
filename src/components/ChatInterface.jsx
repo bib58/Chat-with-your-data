@@ -32,7 +32,8 @@ export default function ChatInterface({ dataset }) {
     setIsTyping(true);
 
     try {
-      const response = await axios.post('http://localhost:8000/chat', {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const response = await axios.post(`${API_URL}/chat`, {
         message: userMessage,
         session_id: 'default',
         dataset_path: dataset.dataset_path || '',
@@ -92,7 +93,7 @@ export default function ChatInterface({ dataset }) {
   };
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 h-full bg-slate-950 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 to-slate-950">
+    <div className="flex-1 flex flex-col min-h-0 h-full bg-slate-950 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 to-slate-950 print:h-auto print:overflow-visible print:block">
       
       <header className="h-16 shrink-0 border-b border-slate-800/60 bg-slate-900/50 backdrop-blur-md flex items-center px-6 sticky top-0 z-10 justify-between">
         <div className="flex items-center gap-3">
@@ -107,13 +108,13 @@ export default function ChatInterface({ dataset }) {
             </p>
           </div>
         </div>
-        <button onClick={() => window.print()} className="flex items-center gap-2 text-slate-400 hover:text-indigo-400 transition-colors text-sm px-3 py-1.5 rounded-md hover:bg-slate-800">
+        <button onClick={() => window.print()} className="flex items-center gap-2 text-slate-400 hover:text-indigo-400 transition-colors text-sm px-3 py-1.5 rounded-md hover:bg-slate-800 print:hidden">
           <FileDown className="w-4 h-4" />
           Export PDF
         </button>
       </header>
 
-      <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+      <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-6 custom-scrollbar print:overflow-visible print:h-auto print:block">
         {messages.map((msg, idx) => (
           <MessageBubble key={idx} message={msg} />
         ))}
@@ -133,7 +134,7 @@ export default function ChatInterface({ dataset }) {
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="p-4 bg-slate-900/80 backdrop-blur-xl border-t border-slate-800/60">
+      <div className="p-4 bg-slate-900/80 backdrop-blur-xl border-t border-slate-800/60 print:hidden">
         <div className="max-w-4xl mx-auto relative group">
           <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-2xl blur opacity-20 group-hover:opacity-40 transition duration-1000"></div>
           <div className="relative flex items-end gap-2 bg-slate-900 border border-slate-700 focus-within:border-indigo-500 rounded-2xl p-2 shadow-2xl transition-colors">

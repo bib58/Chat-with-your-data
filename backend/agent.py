@@ -6,6 +6,10 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel, Field
 import os
 import time
+import warnings
+import traceback
+from dotenv import load_dotenv
+from sqlalchemy import create_engine
 
 # Suppress warnings from langchain_google_genai for clean terminal output
 warnings.filterwarnings("ignore", module="langchain_google_genai")
@@ -153,6 +157,7 @@ def analyze_dataset_node(state: GraphState):
                 f"Data Types:\n{sample_df.dtypes}",
                 f"Sample Data:\n{sample_df.to_string()}",
             ])
+            engine.dispose()
 
         # Store in cache
         _schema_cache[cache_key] = {
@@ -258,6 +263,8 @@ def execute_query_node(state: GraphState):
             serializable = result.to_frame().to_dict(orient="records")
         else:
             serializable = str(result)
+            
+        engine.dispose()
 
         elapsed = time.perf_counter() - start
         print(f"⏱️ SQL EXEC: {elapsed:.2f}s")
