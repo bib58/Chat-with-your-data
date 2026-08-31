@@ -11,18 +11,13 @@ import traceback
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 
-# Suppress warnings from langchain_google_genai for clean terminal output
 warnings.filterwarnings("ignore", module="langchain_google_genai")
 
 load_dotenv()
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
-# ============================================================
-# OPTIMIZATION 1: Singleton LLM — created once, reused forever
-# ============================================================
 _api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
 
-# OPTIMIZATION 4: Default to gemini-3.6-flash (much faster for SQL)
 _model_name = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
 
 LLM = ChatGoogleGenerativeAI(
@@ -31,32 +26,21 @@ LLM = ChatGoogleGenerativeAI(
     temperature=0,
 )
 
-# ============================================================
-# OPTIMIZATION 2: Schema cache — skip re-analysis on every query
-# ============================================================
 _schema_cache: Dict[str, Dict[str, str]] = {}
 
-
-# ---------- State ----------
 class GraphState(TypedDict):
     question: str
     dataset_path: str
     db_uri: str
     df_info: str
     sql_query: str
-    sql_dialect: str          # "sqlite" or "tsql"
+    sql_dialect: str
     execution_result: Any
     chart_needed: bool
     chart_config: Optional[Dict[str, Any]]
     final_answer: str
     error: str
 
-
-# ============================================================
-# OPTIMIZATION 3: Single structured output model
-#   Combines SQL generation + chart decision + answer into ONE
-#   LLM call instead of two separate calls.
-# ============================================================
 class QueryAndAnswer(BaseModel):
     sql_query: str = Field(
         description=(
@@ -76,8 +60,6 @@ class QueryAndAnswer(BaseModel):
     )
 
 
-# ==================== GRAPH NODES ====================
-
 def analyze_dataset_node(state: GraphState):
     """Analyze dataset with caching — supports both CSV→SQLite and SQL Server."""
     start = time.perf_counter()
@@ -85,14 +67,12 @@ def analyze_dataset_node(state: GraphState):
     db_uri = state.get("db_uri", "")
     path = state.get("dataset_path", "")
     
-    # Determine cache key
     cache_key = db_uri if db_uri else path
     
-    # ---- Cache hit → instant return ----
     if cache_key and cache_key in _schema_cache:
         cached = _schema_cache[cache_key]
         elapsed = time.perf_counter() - start
-        print(f"⚡ ANALYZE (cached): {elapsed:.4f}s")
+        print(f"ANALYZE (cached): {elapsed:.4f}s")
         return {
             "df_info": cached["df_info"],
             "db_uri": cached["db_uri"],
@@ -100,7 +80,6 @@ def analyze_dataset_node(state: GraphState):
         }
 
     try:
-        # ---- SQL Server connection (link provided) ----
         if db_uri:
             engine = create_engine(db_uri)
             sql_dialect = "tsql"
@@ -129,7 +108,6 @@ def analyze_dataset_node(state: GraphState):
             df_info = "\n\n".join(info_parts)
             engine.dispose()
         
-        # ---- CSV/Excel upload → SQLite (existing behavior) ----
         else:
             sql_dialect = "sqlite"
             db_path = f"{path}.db"
@@ -137,9 +115,11 @@ def analyze_dataset_node(state: GraphState):
             engine = create_engine(db_uri)
 
             if not os.path.exists(db_path):
-                print("⚡ Creating SQLite database...")
+                print("Creating SQLite database...")
                 if path.endswith('.csv'):
                     df = pd.read_csv(path)
+                elif path.endswith('.json'):
+                    df = pd.read_json(path)
                 else:
                     df = pd.read_excel(path)
                 df.to_sql("data_table", engine, index=False, if_exists="replace")
@@ -159,7 +139,6 @@ def analyze_dataset_node(state: GraphState):
             ])
             engine.dispose()
 
-        # Store in cache
         _schema_cache[cache_key] = {
             "df_info": df_info,
             "db_uri": db_uri,
@@ -167,11 +146,11 @@ def analyze_dataset_node(state: GraphState):
         }
 
         elapsed = time.perf_counter() - start
-        print(f"⏱️ ANALYZE: {elapsed:.2f}s")
+        print(f"ANALYZE: {elapsed:.2f}s")
         return {"df_info": df_info, "db_uri": db_uri, "sql_dialect": sql_dialect}
 
     except Exception as e:
-        print(f"❌ ANALYZE: {time.perf_counter() - start:.2f}s")
+        print(f"ANALYZE: {time.perf_counter() - start:.2f}s")
         return {"error": f"Failed to analyze dataset: {str(e)}"}
 
 
@@ -227,9 +206,9 @@ def generate_query_and_answer_node(state: GraphState):
         ])
 
         elapsed = time.perf_counter() - start
-        print(f"⏱️ LLM (single call): {elapsed:.2f}s")
-        print(f"📝 SQL ({sql_dialect}): {response.sql_query}")
-        print(f"📊 Chart: {response.chart_needed}")
+        print(f"LLM (single call): {elapsed:.2f}s")
+        print(f"SQL ({sql_dialect}): {response.sql_query}")
+        print(f"Chart: {response.chart_needed}")
 
         return {
             "sql_query": response.sql_query,
@@ -238,7 +217,7 @@ def generate_query_and_answer_node(state: GraphState):
         }
 
     except Exception as e:
-        print(f"❌ LLM: {time.perf_counter() - start:.2f}s")
+        print(f"LLM: {time.perf_counter() - start:.2f}s")
         return {"error": f"Failed to generate query: {str(e)}"}
 
 
@@ -267,11 +246,11 @@ def execute_query_node(state: GraphState):
         engine.dispose()
 
         elapsed = time.perf_counter() - start
-        print(f"⏱️ SQL EXEC: {elapsed:.2f}s")
+        print(f"SQL EXEC: {elapsed:.2f}s")
         return {"execution_result": serializable}
 
     except Exception as e:
-        print(f"❌ SQL EXEC: {time.perf_counter() - start:.2f}s")
+        print(f"SQL EXEC: {time.perf_counter() - start:.2f}s")
         traceback.print_exc()
         return {"error": f"Execution failed: {str(e)}"}
 
@@ -289,13 +268,11 @@ def format_response_node(state: GraphState):
     result = state.get("execution_result", [])
     answer = state.get("final_answer", "Here are the results of your query.")
 
-    # --- Enrich answer for scalar results (COUNT, SUM, AVG, etc.) ---
     if isinstance(result, list) and len(result) == 1 and len(result[0]) == 1:
         key = list(result[0].keys())[0]
         value = result[0][key]
         answer = f"{answer}\n\n**{key}:** {value}"
 
-    # --- Chart config (heuristic — no LLM call) ---
     chart_config = None
     if state.get("chart_needed"):
         if result and isinstance(result, list) and len(result) > 0:
@@ -303,7 +280,6 @@ def format_response_node(state: GraphState):
             if len(columns) >= 2:
                 x_key = columns[0]
                 y_key = columns[1]
-                # Use line chart for many data points (time-series feel)
                 chart_type = "line" if len(result) > 12 else "bar"
                 chart_config = {
                     "type": chart_type,
@@ -313,16 +289,10 @@ def format_response_node(state: GraphState):
                 }
 
     elapsed = time.perf_counter() - start
-    print(f"⏱️ FORMAT: {elapsed:.4f}s")
+    print(f"FORMAT: {elapsed:.4f}s")
 
     return {"final_answer": answer, "chart_config": chart_config}
 
-
-# ============================================================
-# Optimised graph: 4 nodes, 1 LLM call, 0 no-ops
-#
-#   START → analyze → generate → execute → format → END
-# ============================================================
 workflow = StateGraph(GraphState)
 
 workflow.add_node("analyze", analyze_dataset_node)
@@ -337,7 +307,6 @@ workflow.add_edge("execute", "format")
 workflow.add_edge("format", END)
 
 app = workflow.compile()
-
 
 def process_chat(question: str, dataset_path: str = "", db_uri: str = ""):
     initial_state = {

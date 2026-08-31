@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import { Send, Loader2, Bot, User, Code, FileDown } from 'lucide-react';
 import MessageBubble from './MessageBubble';
+import botImg from '../assets/bot.png';
 
 export default function ChatInterface({ dataset }) {
   const [messages, setMessages] = useState([
@@ -97,15 +98,11 @@ export default function ChatInterface({ dataset }) {
       
       <header className="h-16 shrink-0 border-b border-slate-800/50 bg-slate-950/40 backdrop-blur-2xl flex items-center px-6 sticky top-0 z-10 justify-between shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center">
-            <Bot className="w-5 h-5 text-indigo-400" />
+          <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center overflow-hidden">
+            <img src={botImg} alt="Bot" className="w-full h-full object-cover" />
           </div>
           <div>
             <h2 className="font-semibold text-slate-200">Analytics Agent</h2>
-            <p className="text-xs text-emerald-400 flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              Online
-            </p>
           </div>
         </div>
         <button onClick={() => window.print()} className="flex items-center gap-2 text-slate-400 hover:text-indigo-400 transition-colors text-sm px-3 py-1.5 rounded-md hover:bg-slate-800 print:hidden">
@@ -121,8 +118,8 @@ export default function ChatInterface({ dataset }) {
         
         {isTyping && (
           <div className="flex gap-4 max-w-3xl">
-            <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center shrink-0 mt-1">
-              <Bot className="w-5 h-5 text-indigo-400" />
+            <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center shrink-0 mt-1 overflow-hidden">
+              <img src={botImg} alt="Bot" className="w-full h-full object-cover" />
             </div>
             <div className="bg-slate-800 border border-slate-700/50 rounded-2xl rounded-tl-sm px-5 py-4 text-slate-200 flex items-center gap-2 shadow-lg">
               <span className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce"></span>
@@ -136,8 +133,7 @@ export default function ChatInterface({ dataset }) {
 
       <div className="p-6 bg-slate-950/40 backdrop-blur-3xl border-t border-slate-800/50 print:hidden">
         <div className="max-w-4xl mx-auto relative group">
-          <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-3xl blur-md opacity-20 group-focus-within:opacity-50 transition duration-1000"></div>
-          <div className="relative flex items-end gap-2 bg-slate-900/90 backdrop-blur-md border border-slate-700/50 focus-within:border-indigo-400 focus-within:ring-4 focus-within:ring-indigo-500/10 rounded-2xl p-2 shadow-2xl transition-all duration-300">
+          <div className="relative flex items-end gap-2 bg-slate-900/90 backdrop-blur-md border border-slate-700/50 focus-within:border-indigo-400 focus-within:ring-4 focus-within:ring-indigo-500/10 rounded-2xl p-2 transition-all duration-300">
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}

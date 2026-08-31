@@ -13,8 +13,8 @@ export default function Sidebar({ dataset, setDataset }) {
     const file = e.target.files[0];
     if (!file) return;
 
-    if (!file.name.endsWith('.csv') && !file.name.endsWith('.xlsx')) {
-      setError('Please upload a CSV or Excel file.');
+    if (!file.name.endsWith('.csv') && !file.name.endsWith('.xlsx') && !file.name.endsWith('.json')) {
+      setError('Please upload a CSV, Excel, or JSON file.');
       return;
     }
 
@@ -63,7 +63,7 @@ export default function Sidebar({ dataset, setDataset }) {
   };
 
   return (
-    <div className="w-80 bg-slate-900/60 backdrop-blur-2xl border-r border-slate-800/50 flex flex-col shadow-2xl z-20 relative print:hidden transition-all duration-300">
+    <div className="w-72 bg-slate-900/60 backdrop-blur-2xl border-r border-slate-800/50 flex flex-col shadow-2xl z-20 relative print:hidden transition-all duration-300">
       <div className="p-6 border-b border-slate-800">
         <h2 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-purple-400 flex items-center gap-2">
           <Database className="w-6 h-6 text-indigo-400" />
@@ -97,7 +97,7 @@ export default function Sidebar({ dataset, setDataset }) {
                 {dataset && dataset.dataset_path ? 'Dataset Ready' : 'Upload Data'}
               </p>
               <p className="text-xs text-slate-400 mt-1">
-                {dataset && dataset.dataset_path ? dataset.filename : 'CSV or Excel formats'}
+                {dataset && dataset.dataset_path ? dataset.filename : 'CSV, Excel, or JSON formats'}
               </p>
             </div>
             

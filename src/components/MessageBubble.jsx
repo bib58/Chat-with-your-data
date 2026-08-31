@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Bot, User, Code, BarChart3, Table as TableIcon, Copy, Check } from 'lucide-react';
+import botImg from '../assets/bot.png';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { 
@@ -71,12 +72,12 @@ export default function MessageBubble({ message }) {
   return (
     <div className={`flex gap-3.5 max-w-[88%] animate-message-enter ${isUser ? 'ml-auto flex-row-reverse' : ''}`}>
       {/* Avatar */}
-      <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-1 shadow-lg ${
+      <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-1 shadow-lg overflow-hidden ${
         isUser 
           ? 'bg-slate-700 text-slate-300 border border-slate-600' 
-          : 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+          : 'bg-indigo-500/20 border border-indigo-500/30'
       }`}>
-        {isUser ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
+        {isUser ? <User className="w-4 h-4" /> : <img src={botImg} alt="Bot" className="w-full h-full object-cover" />}
       </div>
       
       {/* Content wrapper */}

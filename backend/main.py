@@ -31,8 +31,8 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
-    if not file.filename.endswith(('.csv', '.xlsx')):
-        raise HTTPException(status_code=400, detail="Only CSV or Excel files are allowed.")
+    if not file.filename.endswith(('.csv', '.xlsx', '.json')):
+        raise HTTPException(status_code=400, detail="Only CSV, Excel, or JSON files are allowed.")
     
     file_path = os.path.join(UPLOAD_DIR, f"{uuid.uuid4()}_{file.filename}")
     
@@ -40,6 +40,7 @@ async def upload_file(file: UploadFile = File(...)):
         shutil.copyfileobj(file.file, buffer)
         
     return {"dataset_path": file_path, "filename": file.filename}
+
 
 @app.post("/cleanup")
 async def cleanup_files(request: CleanupRequest):
@@ -71,14 +72,12 @@ async def connect_database(request: ConnectRequest):
     try:
         engine = create_engine(connection_string)
         
-        # Test connection and get all table names
         inspector = inspect(engine)
         tables = inspector.get_table_names()
         
         if not tables:
             raise HTTPException(status_code=400, detail="No tables found in the database.")
         
-        # Build schema info for all tables
         tables_info = []
         for table_name in tables:
             try:
@@ -97,10 +96,8 @@ async def connect_database(request: ConnectRequest):
             except Exception:
                 tables_info.append(f"Table: {table_name} (could not read schema)")
         
-        # Extract database name from connection string for display
         db_name = "SQL Server DB"
         try:
-            # Try to extract db name from the URI
             if "/" in connection_string:
                 db_name = connection_string.rstrip("/").split("/")[-1].split("?")[0]
         except Exception:
@@ -110,7 +107,7 @@ async def connect_database(request: ConnectRequest):
         
         return {
             "db_uri": connection_string,
-            "filename": f"🔗 {db_name}",
+            "filename": f"{db_name}",
             "tables_info": "\n\n".join(tables_info),
             "tables": tables,
             "dataset_path": ""
@@ -123,12 +120,9 @@ async def connect_database(request: ConnectRequest):
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
-    # Determine data source: CSV upload or SQL Server link
     if request.db_uri:
-        # SQL Server connection
         result = process_chat(request.message, dataset_path="", db_uri=request.db_uri)
     elif request.dataset_path and os.path.exists(request.dataset_path):
-        # CSV/Excel upload
         result = process_chat(request.message, dataset_path=request.dataset_path)
     else:
         raise HTTPException(status_code=400, detail="No data source provided. Upload a file or connect to SQL Server.")
