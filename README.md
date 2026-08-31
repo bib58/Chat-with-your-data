@@ -1,5 +1,7 @@
 ## Conversational Analytics Dashboard 📊
 
+## [https://data-chit-chat.vercel.app/](https://data-chit-chat.vercel.app/)
+
 This application allows users to interact with their data using natural language. Whether you are uploading a CSV/Excel/JSON file or connecting directly to a live SQL Server database, this application empowers you to ask questions, receive intelligent summaries, view tabular data, and see dynamically generated charts.
 
 ## ✨ Key Features
@@ -40,3 +42,5 @@ This application allows users to interact with their data using natural language
 - Start FastAPI backend (`uvicorn main:app --reload`).
 - Start Vite frontend (`npm run dev`).
 - Render start command **gunicorn main:app --workers 1 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT**
+
+> Use Gunicorn to manage the server process, but use Uvicorn to actually run the FastAPI application.

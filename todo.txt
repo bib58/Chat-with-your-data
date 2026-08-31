@@ -1,3 +1,0 @@
-Make responsive
-search between render start command and fastapi run command
-add deployed link to readme

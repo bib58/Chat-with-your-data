@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import axios from 'axios';
 import { UploadCloud, FileSpreadsheet, CheckCircle2, Loader2, Database, Link, AlertCircle } from 'lucide-react';
 
-export default function Sidebar({ dataset, setDataset }) {
+export default function Sidebar({ dataset, setDataset, isOpen, setIsOpen }) {
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState('');
   const [connectionString, setConnectionString] = useState('');
@@ -63,12 +63,18 @@ export default function Sidebar({ dataset, setDataset }) {
   };
 
   return (
-    <div className="w-72 bg-slate-900/60 backdrop-blur-2xl border-r border-slate-800/50 flex flex-col shadow-2xl z-20 relative print:hidden transition-all duration-300">
-      <div className="p-6 border-b border-slate-800">
+    <div className={`w-72 bg-slate-900/60 backdrop-blur-2xl border-r border-slate-800/50 flex flex-col shadow-2xl z-30 fixed md:relative h-full print:hidden transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+      <div className="p-6 border-b border-slate-800 flex items-center justify-between shrink-0">
         <h2 className="text-xl font-bold bg-clip-text text-transparent bg-linear-to-r from-indigo-400 to-purple-400 flex items-center gap-2">
           <Database className="w-6 h-6 text-indigo-400" />
           Data Hub
         </h2>
+        <button 
+          onClick={() => setIsOpen(false)}
+          className="md:hidden p-2 -mr-2 text-slate-400 hover:text-indigo-400 hover:bg-slate-800/50 rounded-lg transition-colors"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
       </div>
 
       <div className="p-6 flex-1 overflow-y-auto space-y-6">
@@ -164,10 +170,6 @@ export default function Sidebar({ dataset, setDataset }) {
             <p>{error}</p>
           </div>
         )}
-      </div>
-
-      <div className="p-4 border-t border-slate-800 bg-slate-900/50 text-xs text-slate-500 text-center">
-        Powered by LangGraph & Gemini
       </div>
     </div>
   );

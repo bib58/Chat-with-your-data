@@ -4,7 +4,7 @@ import { Send, Loader2, Bot, User, Code, FileDown } from 'lucide-react';
 import MessageBubble from './MessageBubble';
 import botImg from '../assets/bot.png';
 
-export default function ChatInterface({ dataset }) {
+export default function ChatInterface({ dataset, onOpenSidebar }) {
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
@@ -94,8 +94,14 @@ export default function ChatInterface({ dataset }) {
 
   return (
     <div className="flex-1 flex flex-col min-h-0 h-full bg-transparent print:h-auto print:overflow-visible print:block">
-      <header className="h-16 shrink-0 border-b border-slate-800/50 bg-slate-950/40 backdrop-blur-2xl flex items-center px-6 sticky top-0 z-10 justify-between shadow-sm">
+      <header className="h-16 shrink-0 border-b border-slate-800/50 bg-slate-950/40 backdrop-blur-2xl flex items-center px-4 md:px-6 sticky top-0 z-10 justify-between shadow-sm">
         <div className="flex items-center gap-3">
+          <button 
+            onClick={onOpenSidebar}
+            className="md:hidden p-2 -ml-2 rounded-lg text-slate-400 hover:text-indigo-400 hover:bg-slate-800/50 transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
+          </button>
           <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center overflow-hidden">
             <img src={botImg} alt="Bot" className="w-full h-full object-cover" />
           </div>

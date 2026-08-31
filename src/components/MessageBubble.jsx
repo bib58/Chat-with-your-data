@@ -262,11 +262,11 @@ export default function MessageBubble({ message }) {
         )}
 
         {message.type === 'chart' && message.config && message.data && (
-          <div className="mt-2 bg-slate-800 border border-slate-700/50 rounded-xl p-4 shadow-lg w-full min-w-125">
+          <div className="mt-2 bg-slate-800 border border-slate-700/50 rounded-xl p-4 shadow-lg w-full md:min-w-125 overflow-x-auto">
             <div className="flex items-center gap-2 text-sm text-slate-300 font-medium mb-4">
               <BarChart3 className="w-4 h-4 text-purple-400" /> {message.config.title}
             </div>
-            <div className="h-75 w-full">
+            <div className="h-75 w-full min-w-[300px]">
               <ResponsiveContainer width="100%" height="100%">
                 {renderChart(message.config, message.data)}
               </ResponsiveContainer>
