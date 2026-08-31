@@ -10,7 +10,6 @@ import warnings
 import traceback
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
-
 warnings.filterwarnings("ignore", module="langchain_google_genai")
 
 load_dotenv()
