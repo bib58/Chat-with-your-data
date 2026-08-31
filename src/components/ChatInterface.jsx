@@ -33,7 +33,7 @@ export default function ChatInterface({ dataset }) {
     setIsTyping(true);
 
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const API_URL = import.meta.env.VITE_API_URL;
       const response = await axios.post(`${API_URL}/chat`, {
         message: userMessage,
         session_id: 'default',
@@ -42,7 +42,6 @@ export default function ChatInterface({ dataset }) {
       });
 
       const data = response.data;
-      
       const newMessages = [];
       
       if (data.answer) {
@@ -95,7 +94,6 @@ export default function ChatInterface({ dataset }) {
 
   return (
     <div className="flex-1 flex flex-col min-h-0 h-full bg-transparent print:h-auto print:overflow-visible print:block">
-      
       <header className="h-16 shrink-0 border-b border-slate-800/50 bg-slate-950/40 backdrop-blur-2xl flex items-center px-6 sticky top-0 z-10 justify-between shadow-sm">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center overflow-hidden">
@@ -139,7 +137,7 @@ export default function ChatInterface({ dataset }) {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Ask anything about your data... (e.g. 'Show me sales by region')"
-              className="w-full max-h-32 min-h-[44px] bg-transparent resize-none text-slate-200 placeholder:text-slate-500 focus:outline-none py-3 px-4"
+              className="w-full max-h-32 min-h-11 bg-transparent resize-none text-slate-200 placeholder:text-slate-500 focus:outline-none py-3 px-4"
               rows={1}
             />
             <button

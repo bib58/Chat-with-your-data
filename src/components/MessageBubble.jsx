@@ -1,12 +1,9 @@
 import { useState } from 'react';
-import { Bot, User, Code, BarChart3, Table as TableIcon, Copy, Check } from 'lucide-react';
+import { User, Code, BarChart3, Table as TableIcon, Copy, Check } from 'lucide-react';
 import botImg from '../assets/bot.png';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { 
-  BarChart, Bar, LineChart, Line, PieChart, Pie, ScatterChart, Scatter, 
-  XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, Cell
-} from 'recharts';
+import { BarChart, Bar, LineChart, Line, PieChart, Pie, ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
 
 const COLORS = ['#6366f1', '#a855f7', '#ec4899', '#14b8a6', '#f59e0b', '#3b82f6'];
 
@@ -71,35 +68,28 @@ export default function MessageBubble({ message }) {
 
   return (
     <div className={`flex gap-3.5 max-w-[88%] animate-message-enter ${isUser ? 'ml-auto flex-row-reverse' : ''}`}>
-      {/* Avatar */}
-      <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-1 shadow-lg overflow-hidden ${
-        isUser 
-          ? 'bg-slate-700 text-slate-300 border border-slate-600' 
+      <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-1 shadow-lg overflow-hidden ${isUser
+          ? 'bg-slate-700 text-slate-300 border border-slate-600'
           : 'bg-indigo-500/20 border border-indigo-500/30'
-      }`}>
+        }`}>
         {isUser ? <User className="w-4 h-4" /> : <img src={botImg} alt="Bot" className="w-full h-full object-cover" />}
       </div>
-      
-      {/* Content wrapper */}
+
       <div className={`flex flex-col gap-2.5 min-w-0 max-w-full ${isUser ? 'items-end' : 'items-start'}`}>
-        
-        {/* Text / Markdown Message */}
+
         {message.type === 'text' && message.content && (
-          <div className={`group relative px-5 py-4 rounded-2xl shadow-sm text-[14.5px] leading-relaxed transition-all ${
-            isUser 
-              ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-tr-sm shadow-lg shadow-indigo-500/20 pr-11' 
+          <div className={`group relative px-5 py-4 rounded-2xl shadow-sm text-[14.5px] leading-relaxed transition-all ${isUser
+              ? 'bg-linear-to-br from-indigo-500 to-purple-600 text-white rounded-tr-sm shadow-lg shadow-indigo-500/20 pr-11'
               : 'bg-slate-800/80 backdrop-blur-md text-slate-200 border border-slate-700/50 rounded-tl-sm pr-11 shadow-xl shadow-black/20'
-          }`}>
-            {/* Copy Button at Top Right */}
+            }`}>
             <button
               onClick={handleCopy}
               title={copied ? 'Copied!' : 'Copy message'}
               aria-label={copied ? 'Copied to clipboard' : 'Copy message to clipboard'}
-              className={`absolute top-2.5 right-2.5 p-1.5 rounded-lg text-xs flex items-center gap-1 transition-all duration-200 cursor-pointer ${
-                isUser
+              className={`absolute top-2.5 right-2.5 p-1.5 rounded-lg text-xs flex items-center gap-1 transition-all duration-200 cursor-pointer ${isUser
                   ? 'text-indigo-200 hover:text-white hover:bg-indigo-700/60 active:scale-95'
                   : 'text-slate-400 hover:text-slate-100 hover:bg-slate-700/70 active:scale-95'
-              } ${copied ? 'opacity-100 text-emerald-400 hover:text-emerald-300' : 'opacity-70 group-hover:opacity-100'}`}
+                } ${copied ? 'opacity-100 text-emerald-400 hover:text-emerald-300' : 'opacity-70 group-hover:opacity-100'}`}
             >
               {copied ? (
                 <>
@@ -111,7 +101,6 @@ export default function MessageBubble({ message }) {
               )}
             </button>
 
-            {/* Markdown Rendered Content */}
             <div className="markdown-content select-text overflow-hidden">
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
@@ -157,11 +146,10 @@ export default function MessageBubble({ message }) {
                     const isInlineCode = inline ?? (!match && !String(children).includes('\n'));
                     if (isInlineCode) {
                       return (
-                        <code className={`px-1.5 py-0.5 mx-0.5 rounded font-mono text-[13px] ${
-                          isUser 
-                            ? 'bg-indigo-700/70 text-indigo-100 border border-indigo-500/40' 
+                        <code className={`px-1.5 py-0.5 mx-0.5 rounded font-mono text-[13px] ${isUser
+                            ? 'bg-indigo-700/70 text-indigo-100 border border-indigo-500/40'
                             : 'bg-slate-900/90 text-indigo-300 border border-slate-700/60'
-                        }`} {...props}>
+                          }`} {...props}>
                           {children}
                         </code>
                       );
@@ -192,8 +180,7 @@ export default function MessageBubble({ message }) {
             </div>
           </div>
         )}
-        
-        {/* Pandas Code Snippet */}
+
         {message.query && !isUser && (
           <div className="group relative mt-1 bg-slate-950/50 border border-slate-700/50 rounded-xl p-4 shadow-inner max-w-full overflow-x-auto w-full backdrop-blur-sm transition-all duration-300 hover:border-indigo-500/30 hover:shadow-indigo-500/5">
             <div className="flex items-center justify-between gap-2 text-xs font-mono text-slate-500 mb-2">
@@ -224,64 +211,62 @@ export default function MessageBubble({ message }) {
           </div>
         )}
 
-        {/* Table View */}
         {message.type === 'table' && message.data && message.data.length > 0 && (
           <div className="group relative mt-2 bg-slate-800 border border-slate-700/50 rounded-xl overflow-hidden shadow-lg w-full max-w-full overflow-x-auto">
-             <div className="bg-slate-900/70 px-4 py-2.5 border-b border-slate-700/50 flex items-center justify-between text-sm text-slate-300 font-medium">
-               <div className="flex items-center gap-2">
-                 <TableIcon className="w-4 h-4 text-indigo-400" /> Data View
-               </div>
-               <button
-                 onClick={handleCopy}
-                 title={copied ? 'Copied!' : 'Copy table data as JSON'}
-                 className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-200 px-2 py-1 rounded bg-slate-800/80 hover:bg-slate-800 border border-slate-700/50 transition-colors"
-               >
-                 {copied ? (
-                   <>
-                     <Check className="w-3.5 h-3.5 text-emerald-400" />
-                     <span className="text-emerald-400 font-medium">Copied</span>
-                   </>
-                 ) : (
-                   <>
-                     <Copy className="w-3.5 h-3.5" />
-                     <span>Copy JSON</span>
-                   </>
-                 )}
-               </button>
-             </div>
-             <table className="w-full text-left text-sm text-slate-300">
-               <thead className="text-xs uppercase bg-slate-800/80 text-slate-400 border-b border-slate-700/50">
-                 <tr>
-                   {Object.keys(message.data[0]).map(key => (
-                     <th key={key} className="px-4 py-3">{key}</th>
-                   ))}
-                 </tr>
-               </thead>
-               <tbody>
-                 {message.data.slice(0, 10).map((row, i) => (
-                   <tr key={i} className="border-b border-slate-700/30 hover:bg-slate-700/20 transition-colors">
-                     {Object.values(row).map((val, j) => (
-                       <td key={j} className="px-4 py-2 whitespace-nowrap">{String(val)}</td>
-                     ))}
-                   </tr>
-                 ))}
-               </tbody>
-             </table>
-             {message.data.length > 10 && (
-               <div className="px-4 py-2 text-xs text-center text-slate-500 bg-slate-800/30">
-                 Showing 10 of {message.data.length} rows
-               </div>
-             )}
+            <div className="bg-slate-900/70 px-4 py-2.5 border-b border-slate-700/50 flex items-center justify-between text-sm text-slate-300 font-medium">
+              <div className="flex items-center gap-2">
+                <TableIcon className="w-4 h-4 text-indigo-400" /> Data View
+              </div>
+              <button
+                onClick={handleCopy}
+                title={copied ? 'Copied!' : 'Copy table data as JSON'}
+                className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-200 px-2 py-1 rounded bg-slate-800/80 hover:bg-slate-800 border border-slate-700/50 transition-colors"
+              >
+                {copied ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    <span className="text-emerald-400 font-medium">Copied</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>Copy JSON</span>
+                  </>
+                )}
+              </button>
+            </div>
+            <table className="w-full text-left text-sm text-slate-300">
+              <thead className="text-xs uppercase bg-slate-800/80 text-slate-400 border-b border-slate-700/50">
+                <tr>
+                  {Object.keys(message.data[0]).map(key => (
+                    <th key={key} className="px-4 py-3">{key}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {message.data.slice(0, 10).map((row, i) => (
+                  <tr key={i} className="border-b border-slate-700/30 hover:bg-slate-700/20 transition-colors">
+                    {Object.values(row).map((val, j) => (
+                      <td key={j} className="px-4 py-2 whitespace-nowrap">{String(val)}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {message.data.length > 10 && (
+              <div className="px-4 py-2 text-xs text-center text-slate-500 bg-slate-800/30">
+                Showing 10 of {message.data.length} rows
+              </div>
+            )}
           </div>
         )}
 
-        {/* Chart View */}
         {message.type === 'chart' && message.config && message.data && (
-          <div className="mt-2 bg-slate-800 border border-slate-700/50 rounded-xl p-4 shadow-lg w-full min-w-[500px]">
+          <div className="mt-2 bg-slate-800 border border-slate-700/50 rounded-xl p-4 shadow-lg w-full min-w-125">
             <div className="flex items-center gap-2 text-sm text-slate-300 font-medium mb-4">
-               <BarChart3 className="w-4 h-4 text-purple-400" /> {message.config.title}
+              <BarChart3 className="w-4 h-4 text-purple-400" /> {message.config.title}
             </div>
-            <div className="h-[300px] w-full">
+            <div className="h-75 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 {renderChart(message.config, message.data)}
               </ResponsiveContainer>
@@ -295,7 +280,7 @@ export default function MessageBubble({ message }) {
 
 function renderChart(config, data) {
   const { type, xKey, yKey } = config;
-  
+
   if (type === 'bar') {
     return (
       <BarChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
@@ -307,7 +292,7 @@ function renderChart(config, data) {
       </BarChart>
     );
   }
-  
+
   if (type === 'line') {
     return (
       <LineChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>

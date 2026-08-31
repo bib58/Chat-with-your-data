@@ -25,7 +25,7 @@ export default function Sidebar({ dataset, setDataset }) {
     setError('');
 
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const API_URL = import.meta.env.VITE_API_URL;
       const response = await axios.post(`${API_URL}/upload`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
@@ -49,7 +49,7 @@ export default function Sidebar({ dataset, setDataset }) {
     setError('');
 
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const API_URL = import.meta.env.VITE_API_URL;
       const response = await axios.post(`${API_URL}/connect`, {
         connection_string: connectionString.trim()
       });
@@ -65,33 +65,32 @@ export default function Sidebar({ dataset, setDataset }) {
   return (
     <div className="w-72 bg-slate-900/60 backdrop-blur-2xl border-r border-slate-800/50 flex flex-col shadow-2xl z-20 relative print:hidden transition-all duration-300">
       <div className="p-6 border-b border-slate-800">
-        <h2 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-purple-400 flex items-center gap-2">
+        <h2 className="text-xl font-bold bg-clip-text text-transparent bg-linear-to-r from-indigo-400 to-purple-400 flex items-center gap-2">
           <Database className="w-6 h-6 text-indigo-400" />
           Data Hub
         </h2>
       </div>
 
       <div className="p-6 flex-1 overflow-y-auto space-y-6">
-        {/* Section 1: File Upload */}
         <div>
           <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">
             Upload File
           </h3>
-          
-          <div 
+
+          <div
             onClick={() => fileInputRef.current?.click()}
             className="group relative overflow-hidden rounded-xl bg-slate-800/40 hover:bg-slate-800/80 border border-slate-700/50 hover:border-indigo-400 hover:shadow-[0_0_20px_-5px_rgba(99,102,241,0.3)] transition-all duration-300 cursor-pointer p-8 flex flex-col items-center justify-center gap-3 text-center"
           >
-            <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-            
+            <div className="absolute inset-0 bg-linear-to-br from-indigo-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
             {isUploading ? (
               <Loader2 className="w-8 h-8 text-indigo-400 animate-spin" />
             ) : dataset && dataset.dataset_path ? (
               <CheckCircle2 className="w-8 h-8 text-emerald-400" />
             ) : (
-              <UploadCloud className="w-8 h-8 text-indigo-400 group-hover:-translate-y-1 transition-transform" />
+              <UploadCloud className="w-8 h-8 text-indigo-400 transition-transform" />
             )}
-            
+
             <div>
               <p className="font-medium text-slate-200">
                 {dataset && dataset.dataset_path ? 'Dataset Ready' : 'Upload Data'}
@@ -100,31 +99,23 @@ export default function Sidebar({ dataset, setDataset }) {
                 {dataset && dataset.dataset_path ? dataset.filename : 'CSV, Excel, or JSON formats'}
               </p>
             </div>
-            
-            <input 
-              type="file" 
-              className="hidden" 
-              ref={fileInputRef} 
-              accept=".csv,.xlsx" 
-              onChange={handleFileUpload}
-            />
+
+            <input type="file" className="hidden" ref={fileInputRef} accept=".csv,.xlsx" onChange={handleFileUpload} />
           </div>
         </div>
 
-        {/* Divider */}
         <div className="flex items-center gap-3">
           <div className="flex-1 h-px bg-slate-700/60"></div>
           <span className="text-xs text-slate-500 font-medium">OR</span>
           <div className="flex-1 h-px bg-slate-700/60"></div>
         </div>
 
-        {/* Section 2: SQL Server Link */}
         <div>
           <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
             <Link className="w-3.5 h-3.5" />
             SQL Server Link
           </h3>
-          
+
           {dataset && dataset.db_uri ? (
             <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/30 p-4 flex flex-col items-center gap-2 text-center">
               <CheckCircle2 className="w-8 h-8 text-emerald-400" />
@@ -167,7 +158,6 @@ export default function Sidebar({ dataset, setDataset }) {
           )}
         </div>
 
-        {/* Error Message */}
         {error && (
           <div className="flex items-start gap-2 text-red-400 text-xs bg-red-500/10 border border-red-500/20 rounded-lg p-3">
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
@@ -175,7 +165,7 @@ export default function Sidebar({ dataset, setDataset }) {
           </div>
         )}
       </div>
-      
+
       <div className="p-4 border-t border-slate-800 bg-slate-900/50 text-xs text-slate-500 text-center">
         Powered by LangGraph & Gemini
       </div>
