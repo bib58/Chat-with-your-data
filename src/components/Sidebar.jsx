@@ -63,7 +63,7 @@ export default function Sidebar({ dataset, setDataset }) {
   };
 
   return (
-    <div className="w-72 bg-slate-900 border-r border-slate-800 flex flex-col shadow-2xl z-20 relative print:hidden">
+    <div className="w-80 bg-slate-900/60 backdrop-blur-2xl border-r border-slate-800/50 flex flex-col shadow-2xl z-20 relative print:hidden transition-all duration-300">
       <div className="p-6 border-b border-slate-800">
         <h2 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-purple-400 flex items-center gap-2">
           <Database className="w-6 h-6 text-indigo-400" />
@@ -80,9 +80,9 @@ export default function Sidebar({ dataset, setDataset }) {
           
           <div 
             onClick={() => fileInputRef.current?.click()}
-            className="group relative overflow-hidden rounded-xl bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 hover:border-indigo-500/50 transition-all cursor-pointer p-6 flex flex-col items-center justify-center gap-3 text-center"
+            className="group relative overflow-hidden rounded-xl bg-slate-800/40 hover:bg-slate-800/80 border border-slate-700/50 hover:border-indigo-400 hover:shadow-[0_0_20px_-5px_rgba(99,102,241,0.3)] transition-all duration-300 cursor-pointer p-8 flex flex-col items-center justify-center gap-3 text-center"
           >
-            <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
             
             {isUploading ? (
               <Loader2 className="w-8 h-8 text-indigo-400 animate-spin" />
@@ -143,7 +143,7 @@ export default function Sidebar({ dataset, setDataset }) {
                 value={connectionString}
                 onChange={(e) => setConnectionString(e.target.value)}
                 placeholder={"mssql+pymssql://user:pass@server:1433/dbname"}
-                className="w-full bg-slate-800/70 border border-slate-700/50 focus:border-indigo-500/50 rounded-lg px-3 py-2.5 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none resize-none transition-colors"
+                className="w-full bg-slate-950/50 border border-slate-700/60 focus:border-indigo-400 rounded-xl px-4 py-3 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 resize-none transition-all duration-300 shadow-inner"
                 rows={3}
               />
               <button

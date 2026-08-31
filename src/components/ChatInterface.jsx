@@ -93,9 +93,9 @@ export default function ChatInterface({ dataset }) {
   };
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 h-full bg-slate-950 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 to-slate-950 print:h-auto print:overflow-visible print:block">
+    <div className="flex-1 flex flex-col min-h-0 h-full bg-transparent print:h-auto print:overflow-visible print:block">
       
-      <header className="h-16 shrink-0 border-b border-slate-800/60 bg-slate-900/50 backdrop-blur-md flex items-center px-6 sticky top-0 z-10 justify-between">
+      <header className="h-16 shrink-0 border-b border-slate-800/50 bg-slate-950/40 backdrop-blur-2xl flex items-center px-6 sticky top-0 z-10 justify-between shadow-sm">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center">
             <Bot className="w-5 h-5 text-indigo-400" />
@@ -134,10 +134,10 @@ export default function ChatInterface({ dataset }) {
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="p-4 bg-slate-900/80 backdrop-blur-xl border-t border-slate-800/60 print:hidden">
+      <div className="p-6 bg-slate-950/40 backdrop-blur-3xl border-t border-slate-800/50 print:hidden">
         <div className="max-w-4xl mx-auto relative group">
-          <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-2xl blur opacity-20 group-hover:opacity-40 transition duration-1000"></div>
-          <div className="relative flex items-end gap-2 bg-slate-900 border border-slate-700 focus-within:border-indigo-500 rounded-2xl p-2 shadow-2xl transition-colors">
+          <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-3xl blur-md opacity-20 group-focus-within:opacity-50 transition duration-1000"></div>
+          <div className="relative flex items-end gap-2 bg-slate-900/90 backdrop-blur-md border border-slate-700/50 focus-within:border-indigo-400 focus-within:ring-4 focus-within:ring-indigo-500/10 rounded-2xl p-2 shadow-2xl transition-all duration-300">
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -149,9 +149,9 @@ export default function ChatInterface({ dataset }) {
             <button
               onClick={handleSend}
               disabled={!input.trim() || isTyping}
-              className="w-11 h-11 rounded-xl bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 disabled:hover:bg-indigo-500 text-white flex items-center justify-center shrink-0 transition-colors shadow-lg shadow-indigo-500/25"
+              className="w-12 h-12 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:hover:bg-indigo-600 text-white flex items-center justify-center shrink-0 transition-all duration-300 shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 hover:-translate-y-0.5"
             >
-              {isTyping ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5 ml-1" />}
+              {isTyping ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5 ml-0.5" />}
             </button>
           </div>
         </div>

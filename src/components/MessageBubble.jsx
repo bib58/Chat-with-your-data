@@ -69,7 +69,7 @@ export default function MessageBubble({ message }) {
   };
 
   return (
-    <div className={`flex gap-3.5 max-w-[88%] ${isUser ? 'ml-auto flex-row-reverse' : ''}`}>
+    <div className={`flex gap-3.5 max-w-[88%] animate-message-enter ${isUser ? 'ml-auto flex-row-reverse' : ''}`}>
       {/* Avatar */}
       <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-1 shadow-lg ${
         isUser 
@@ -86,8 +86,8 @@ export default function MessageBubble({ message }) {
         {message.type === 'text' && message.content && (
           <div className={`group relative px-5 py-4 rounded-2xl shadow-sm text-[14.5px] leading-relaxed transition-all ${
             isUser 
-              ? 'bg-indigo-600 text-white rounded-tr-sm shadow-indigo-900/20 pr-11' 
-              : 'bg-slate-800/95 text-slate-200 border border-slate-700/60 rounded-tl-sm pr-11 shadow-slate-950/40'
+              ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-tr-sm shadow-lg shadow-indigo-500/20 pr-11' 
+              : 'bg-slate-800/80 backdrop-blur-md text-slate-200 border border-slate-700/50 rounded-tl-sm pr-11 shadow-xl shadow-black/20'
           }`}>
             {/* Copy Button at Top Right */}
             <button
@@ -172,7 +172,7 @@ export default function MessageBubble({ message }) {
                     );
                   },
                   pre: ({ node, ...props }) => (
-                    <pre className="p-3.5 my-2.5 rounded-xl bg-slate-950/80 border border-slate-800 overflow-x-auto text-xs font-mono custom-scrollbar shadow-inner" {...props} />
+                    <pre className="p-4 my-3 rounded-xl bg-slate-950/90 border border-slate-800/80 overflow-x-auto text-[13px] leading-relaxed font-mono custom-scrollbar shadow-inner" {...props} />
                   ),
                   table: ({ node, ...props }) => (
                     <div className="overflow-x-auto my-3 rounded-lg border border-slate-700/60">
@@ -194,7 +194,7 @@ export default function MessageBubble({ message }) {
         
         {/* Pandas Code Snippet */}
         {message.query && !isUser && (
-          <div className="group relative mt-1 bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-inner max-w-full overflow-x-auto w-full">
+          <div className="group relative mt-1 bg-slate-950/50 border border-slate-700/50 rounded-xl p-4 shadow-inner max-w-full overflow-x-auto w-full backdrop-blur-sm transition-all duration-300 hover:border-indigo-500/30 hover:shadow-indigo-500/5">
             <div className="flex items-center justify-between gap-2 text-xs font-mono text-slate-500 mb-2">
               <span className="flex items-center gap-1.5 uppercase tracking-wider text-slate-400">
                 <Code className="w-3.5 h-3.5 text-indigo-400" /> Generated SQL Query
