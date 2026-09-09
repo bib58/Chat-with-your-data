@@ -12,3 +12,4 @@ openpyxl
 sqlalchemy
 langchain-community
 pymssql
+sqlglot

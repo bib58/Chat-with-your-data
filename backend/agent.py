@@ -1,5 +1,5 @@
 import pandas as pd
-from typing import TypedDict, Any, Optional, Dict
+from typing import TypedDict, Any, Optional, Dict, List
 from langgraph.graph import StateGraph, START, END
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -21,17 +21,25 @@ _model_name = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
 
 LLM = ChatGoogleGenerativeAI(
     model=_model_name,
-    google_api_key=_api_key,
+    google_api_key=_api_key or "placeholder_key",
     temperature=0,
 )
 
-_schema_cache: Dict[str, Dict[str, str]] = {}
+ENABLE_GUARDRAILS = os.getenv("ENABLE_GUARDRAILS", "true").lower() in ("true", "1", "yes")
 
-class GraphState(TypedDict):
+try:
+    from .guardrails import validate_input, validate_sql, sanitize_output
+except ImportError:
+    from guardrails import validate_input, validate_sql, sanitize_output
+
+_schema_cache: Dict[str, Dict[str, Any]] = {}
+
+class GraphState(TypedDict, total=False):
     question: str
     dataset_path: str
     db_uri: str
     df_info: str
+    allowed_tables: Optional[List[str]]
     sql_query: str
     sql_dialect: str
     execution_result: Any
@@ -59,8 +67,27 @@ class QueryAndAnswer(BaseModel):
     )
 
 
+def input_guardrail_node(state: GraphState):
+    """Validates user input against prompt injection, jailbreaks, and unsafe commands."""
+    if not ENABLE_GUARDRAILS:
+        return {}
+
+    question = state.get("question", "")
+    is_safe, refusal_reason = validate_input(question)
+    if not is_safe:
+        print(f"INPUT GUARDRAIL: Blocked prompt ({refusal_reason})")
+        return {
+            "error": refusal_reason,
+            "final_answer": refusal_reason,
+        }
+    return {}
+
+
 def analyze_dataset_node(state: GraphState):
     """Analyze dataset with caching — supports both CSV→SQLite and SQL Server."""
+    if state.get("error"):
+        return state
+
     start = time.perf_counter()
     
     db_uri = state.get("db_uri", "")
@@ -76,6 +103,7 @@ def analyze_dataset_node(state: GraphState):
             "df_info": cached["df_info"],
             "db_uri": cached["db_uri"],
             "sql_dialect": cached["sql_dialect"],
+            "allowed_tables": cached.get("allowed_tables", []),
         }
 
     try:
@@ -86,6 +114,7 @@ def analyze_dataset_node(state: GraphState):
             from sqlalchemy import inspect
             inspector = inspect(engine)
             tables = inspector.get_table_names()
+            allowed_tables = list(tables)
             
             info_parts = []
             for table_name in tables:
@@ -112,8 +141,13 @@ def analyze_dataset_node(state: GraphState):
             db_path = f"{path}.db"
             db_uri = f"sqlite:///{db_path}"
             engine = create_engine(db_uri)
+            allowed_tables = ["data_table"]
 
-            if not os.path.exists(db_path):
+            from sqlalchemy import inspect
+            inspector = inspect(engine)
+            table_exists = "data_table" in inspector.get_table_names()
+
+            if not os.path.exists(db_path) or not table_exists:
                 print("Creating SQLite database...")
                 if path.endswith('.csv'):
                     df = pd.read_csv(path)
@@ -142,11 +176,17 @@ def analyze_dataset_node(state: GraphState):
             "df_info": df_info,
             "db_uri": db_uri,
             "sql_dialect": sql_dialect,
+            "allowed_tables": allowed_tables,
         }
 
         elapsed = time.perf_counter() - start
         print(f"ANALYZE: {elapsed:.2f}s")
-        return {"df_info": df_info, "db_uri": db_uri, "sql_dialect": sql_dialect}
+        return {
+            "df_info": df_info,
+            "db_uri": db_uri,
+            "sql_dialect": sql_dialect,
+            "allowed_tables": allowed_tables,
+        }
 
     except Exception as e:
         print(f"ANALYZE: {time.perf_counter() - start:.2f}s")
@@ -220,6 +260,32 @@ def generate_query_and_answer_node(state: GraphState):
         return {"error": f"Failed to generate query: {str(e)}"}
 
 
+def sql_guardrail_node(state: GraphState):
+    """Validates that the generated SQL is strictly read-only, bounded, and targets valid tables."""
+    if not ENABLE_GUARDRAILS or state.get("error"):
+        return state
+
+    sql_query = state.get("sql_query", "")
+    sql_dialect = state.get("sql_dialect", "sqlite")
+    allowed_tables = state.get("allowed_tables", [])
+
+    is_safe, validated_query, error_msg = validate_sql(
+        query=sql_query,
+        dialect=sql_dialect,
+        allowed_tables=allowed_tables if allowed_tables else None,
+    )
+
+    if not is_safe:
+        print(f"SQL GUARDRAIL: Blocked query ({error_msg})")
+        return {
+            "error": error_msg,
+            "final_answer": f"I cannot execute this query because it was flagged by safety guardrails: {error_msg}",
+            "sql_query": sql_query,
+        }
+
+    return {"sql_query": validated_query}
+
+
 def execute_query_node(state: GraphState):
     """Execute the generated SQL against the cached SQLite database."""
     if state.get("error"):
@@ -258,7 +324,7 @@ def format_response_node(state: GraphState):
     """Build chart config heuristically and enrich the answer — NO LLM call."""
     if state.get("error"):
         return {
-            "final_answer": f"I encountered an error: {state['error']}",
+            "final_answer": state.get("final_answer") or f"I encountered an error: {state['error']}",
             "chart_config": None,
         }
 
@@ -292,18 +358,46 @@ def format_response_node(state: GraphState):
 
     return {"final_answer": answer, "chart_config": chart_config}
 
+
+def output_guardrail_node(state: GraphState):
+    """Sanitizes output text, redacts sensitive PII/secrets, and bounds table payload."""
+    if not ENABLE_GUARDRAILS:
+        return {}
+
+    raw_answer = state.get("final_answer", "")
+    raw_table = state.get("execution_result", None)
+
+    table_list = raw_table if isinstance(raw_table, list) else None
+    safe_answer, safe_table = sanitize_output(raw_answer, table_list)
+
+    update = {"final_answer": safe_answer}
+    if table_list is not None:
+        update["execution_result"] = safe_table
+    return update
+
+
 workflow = StateGraph(GraphState)
 
+workflow.add_node("input_guardrail", input_guardrail_node)
 workflow.add_node("analyze", analyze_dataset_node)
 workflow.add_node("generate", generate_query_and_answer_node)
+workflow.add_node("sql_guardrail", sql_guardrail_node)
 workflow.add_node("execute", execute_query_node)
 workflow.add_node("format", format_response_node)
+workflow.add_node("output_guardrail", output_guardrail_node)
 
-workflow.add_edge(START, "analyze")
+workflow.add_edge(START, "input_guardrail")
+workflow.add_conditional_edges(
+    "input_guardrail",
+    lambda state: "output_guardrail" if state.get("error") else "analyze",
+    {"output_guardrail": "output_guardrail", "analyze": "analyze"},
+)
 workflow.add_edge("analyze", "generate")
-workflow.add_edge("generate", "execute")
+workflow.add_edge("generate", "sql_guardrail")
+workflow.add_edge("sql_guardrail", "execute")
 workflow.add_edge("execute", "format")
-workflow.add_edge("format", END)
+workflow.add_edge("format", "output_guardrail")
+workflow.add_edge("output_guardrail", END)
 
 app = workflow.compile()
 

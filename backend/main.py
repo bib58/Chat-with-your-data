@@ -128,7 +128,8 @@ async def chat(request: ChatRequest):
         raise HTTPException(status_code=400, detail="No data source provided. Upload a file or connect to SQL Server.")
         
     if result.get("error"):
-        return ChatResponse(answer=f"Error: {result['error']}", table_data=None, chart_config=None, query_executed=None)
+        error_msg = result.get("final_answer") or f"Error: {result['error']}"
+        return ChatResponse(answer=error_msg, table_data=None, chart_config=None, query_executed=result.get("sql_query"))
         
     execution_result = result.get("execution_result")
     table_data = None
