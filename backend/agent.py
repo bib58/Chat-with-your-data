@@ -28,9 +28,9 @@ LLM = ChatGoogleGenerativeAI(
 ENABLE_GUARDRAILS = os.getenv("ENABLE_GUARDRAILS", "true").lower() in ("true", "1", "yes")
 
 try:
-    from .guardrails import validate_input, validate_sql, sanitize_output
+    from .guardrails import validate_input, check_relevance, validate_sql, sanitize_output
 except ImportError:
-    from guardrails import validate_input, validate_sql, sanitize_output
+    from guardrails import validate_input, check_relevance, validate_sql, sanitize_output
 
 _schema_cache: Dict[str, Dict[str, Any]] = {}
 
@@ -193,6 +193,28 @@ def analyze_dataset_node(state: GraphState):
         return {"error": f"Failed to analyze dataset: {str(e)}"}
 
 
+def relevance_guardrail_node(state: GraphState):
+    """Uses LLM to check if the question is relevant to the connected dataset."""
+    if not ENABLE_GUARDRAILS or state.get("error"):
+        return {}
+
+    question = state.get("question", "")
+    schema_info = state.get("df_info", "")
+
+    if not schema_info:
+        # No schema available, let it through
+        return {}
+
+    is_relevant, refusal_reason = check_relevance(question, schema_info, LLM)
+    if not is_relevant:
+        print(f"RELEVANCE GUARDRAIL: Blocked off-topic question: '{question}'")
+        return {
+            "error": refusal_reason,
+            "final_answer": refusal_reason,
+        }
+    return {}
+
+
 def generate_query_and_answer_node(state: GraphState):
     """Single LLM call → SQL + chart decision + answer sketch."""
     if state.get("error"):
@@ -224,13 +246,25 @@ def generate_query_and_answer_node(state: GraphState):
         )
 
     system_prompt = (
-        "You are an expert SQL data analyst. Given a dataset schema and a "
+        "You are an expert SQL data analyst. You MUST ONLY answer questions that can be "
+        "answered by querying the provided dataset. Given a dataset schema and a "
         "user question:\n"
         f"{dialect_instructions}\n"
         "2. Decide if a chart would help visualize the answer.\n"
         "3. Write a brief natural-language answer (1-3 sentences) summarising "
         "what the query reveals. The raw data will be shown in a table, so "
-        "don't list every row — just state the insight."
+        "don't list every row — just state the insight.\n\n"
+        "CRITICAL RULES:\n"
+        "- You are STRICTLY a data analysis assistant. ONLY answer questions that can be "
+        "answered by querying the actual columns and data in the provided dataset schema.\n"
+        "- NEVER answer general knowledge questions, trivia, or anything unrelated to the dataset.\n"
+        "- NEVER fabricate SQL queries that use hardcoded values to fake an answer "
+        "(e.g., SELECT 'Paris' AS answer). Every query MUST reference actual table columns.\n"
+        "- If the question cannot be answered from the dataset, set sql_query to "
+        "'SELECT NULL AS not_applicable LIMIT 0' and set answer_sketch to "
+        "'This question is not related to your dataset. I can only answer questions about "
+        "the data in your uploaded file or connected database.'\n"
+        "- Your SQL must ALWAYS reference real columns from the schema — never invent data."
     )
 
     user_prompt = (
@@ -380,6 +414,7 @@ workflow = StateGraph(GraphState)
 
 workflow.add_node("input_guardrail", input_guardrail_node)
 workflow.add_node("analyze", analyze_dataset_node)
+workflow.add_node("relevance_guardrail", relevance_guardrail_node)
 workflow.add_node("generate", generate_query_and_answer_node)
 workflow.add_node("sql_guardrail", sql_guardrail_node)
 workflow.add_node("execute", execute_query_node)
@@ -392,7 +427,12 @@ workflow.add_conditional_edges(
     lambda state: "output_guardrail" if state.get("error") else "analyze",
     {"output_guardrail": "output_guardrail", "analyze": "analyze"},
 )
-workflow.add_edge("analyze", "generate")
+workflow.add_edge("analyze", "relevance_guardrail")
+workflow.add_conditional_edges(
+    "relevance_guardrail",
+    lambda state: "output_guardrail" if state.get("error") else "generate",
+    {"output_guardrail": "output_guardrail", "generate": "generate"},
+)
 workflow.add_edge("generate", "sql_guardrail")
 workflow.add_edge("sql_guardrail", "execute")
 workflow.add_edge("execute", "format")

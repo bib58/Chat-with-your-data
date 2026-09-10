@@ -77,3 +77,66 @@ def validate_input(prompt: str) -> Tuple[bool, Optional[str]]:
             )
 
     return True, None
+
+
+def check_relevance(question: str, schema_info: str, llm) -> Tuple[bool, Optional[str]]:
+    """
+    Uses a lightweight LLM call to check whether the user's question is relevant
+    to the connected dataset. This prevents the agent from answering general
+    knowledge questions, trivia, or anything unrelated to the data.
+
+    Args:
+        question: The user's question.
+        schema_info: The dataset schema description (tables, columns, types).
+        llm: The LLM instance to use for the relevance check.
+
+    Returns:
+        (is_relevant, refusal_reason)
+    """
+    from langchain_core.messages import HumanMessage, SystemMessage
+
+    relevance_prompt = f"""You are a strict relevance classifier for a data analytics agent.
+
+The user has connected a dataset with the following schema:
+{schema_info}
+
+Your ONLY job is to decide whether the user's question can be answered by querying this dataset.
+
+A question is RELEVANT if:
+- It asks about data, values, counts, trends, summaries, statistics, or patterns that exist in the dataset columns/tables
+- It asks to filter, sort, group, aggregate, or compare data from the dataset
+- It references column names, table names, or data values that could plausibly exist in the dataset
+- It asks about the structure of the dataset (e.g., "what columns are there", "how many rows")
+
+A question is OFF-TOPIC if:
+- It asks general knowledge questions (e.g., "What is the capital of France?", "Who is the president?")
+- It asks about topics completely unrelated to the dataset (e.g., weather, sports scores, history, science, coding help)
+- It asks you to write code, poems, stories, or do tasks unrelated to data analysis
+- It asks about things that cannot possibly be answered from the dataset tables/columns
+
+Respond with EXACTLY one word: RELEVANT or OFFTOPIC
+
+User question: {question}"""
+
+    try:
+        response = llm.invoke([
+            SystemMessage(content="You are a strict relevance classifier. Respond with exactly one word: RELEVANT or OFFTOPIC"),
+            HumanMessage(content=relevance_prompt),
+        ])
+
+        result = response.content.strip().upper()
+
+        if "OFFTOPIC" in result:
+            return False, (
+                "I can only answer questions related to your connected dataset. "
+                "Your question doesn't appear to be about the data you've uploaded. "
+                "Please ask something about your data — for example, try asking about "
+                "specific columns, trends, counts, or summaries from your dataset."
+            )
+
+        return True, None
+
+    except Exception as e:
+        # If the relevance check fails, let the question through rather than blocking
+        print(f"RELEVANCE CHECK: Error ({e}), allowing question through")
+        return True, None
