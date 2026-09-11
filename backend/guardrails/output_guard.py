@@ -1,22 +1,19 @@
 import re
 from typing import Tuple, Optional, List, Dict, Any
 
-# Patterns for sensitive PII and secrets
 CREDIT_CARD_PATTERN = r"\b(?:\d{4}[ -]?){3}\d{4}\b|\b\d{13,19}\b"
 EMAIL_PATTERN = r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
 API_KEY_PATTERNS = [
-    r"AIza[0-9A-Za-z\-_]{20,}",          # Google API Keys
-    r"sk-[a-zA-Z0-9]{20,}",              # OpenAI/Gemini generic keys
-    r"Bearer\s+[A-Za-z0-9\-._~+/]+=*",   # Bearer tokens
+    r"AIza[0-9A-Za-z\-_]{20,}",
+    r"sk-[a-zA-Z0-9]{20,}",
+    r"Bearer\s+[A-Za-z0-9\-._~+/]+=*",
 ]
 
-# Sensitive local file paths
 SERVER_PATH_PATTERNS = [
-    r"[a-zA-Z]:\\[^\s\"'<>]+",          # Windows absolute paths
-    r"/(?:Users|home|var|tmp|etc)/[^\s\"'<>]+", # Unix absolute paths
+    r"[a-zA-Z]:\\[^\s\"'<>]+"
+    r"/(?:Users|home|var|tmp|etc)/[^\s\"'<>]+",
 ]
 
-# HTML injection patterns (XSS prevention)
 HTML_SCRIPT_PATTERN = r"<\s*(script|iframe|object|embed)[^>]*>.*?<\s*/\s*\1\s*>"
 HTML_TAG_EVENT_PATTERN = r"<\s*[^>]+\s+on\w+\s*=\s*['\"][^'\"]*['\"][^>]*>"
 
@@ -33,7 +30,6 @@ def sanitize_text(text: str) -> str:
     for pattern in API_KEY_PATTERNS:
         sanitized = re.sub(pattern, "[REDACTED_KEY]", sanitized)
 
-    # Redact Emails
     sanitized = re.sub(EMAIL_PATTERN, "[REDACTED_EMAIL]", sanitized)
 
     def mask_cc(match):

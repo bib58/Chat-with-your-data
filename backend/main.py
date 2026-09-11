@@ -68,7 +68,6 @@ async def connect_database(request: ConnectRequest):
     
     if not connection_string:
         raise HTTPException(status_code=400, detail="Connection string is required.")
-    
     try:
         engine = create_engine(connection_string)
         
@@ -130,7 +129,14 @@ async def chat(request: ChatRequest):
     if result.get("error"):
         error_msg = result.get("final_answer") or f"Error: {result['error']}"
         return ChatResponse(answer=error_msg, table_data=None, chart_config=None, query_executed=result.get("sql_query"))
-        
+
+    if result.get("off_topic"):
+        raw_answer = result.get("final_answer", "I'm a data analysis assistant — I can only answer questions about your uploaded dataset.")
+        answer_str = str(raw_answer) if not isinstance(raw_answer, list) else "\n".join(
+            part.get("text", str(part)) if isinstance(part, dict) else str(part) for part in raw_answer
+        )
+        return ChatResponse(answer=answer_str, table_data=None, chart_config=None, query_executed=None)
+
     execution_result = result.get("execution_result")
     table_data = None
     if isinstance(execution_result, list):
