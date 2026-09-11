@@ -1,7 +1,6 @@
 import re
 from typing import Tuple, Optional
 
-# Regex patterns for detecting prompt injection, jailbreaks, and adversarial manipulation
 PROMPT_INJECTION_PATTERNS = [
     r"ignore\s+(all\s+|the\s+)?(previous|prior|above)\s+(instructions|prompts|rules|commands)",
     r"disregard\s+(all\s+|the\s+)?(previous|prior|above)\s+(instructions|prompts|rules|commands)",
@@ -16,7 +15,6 @@ PROMPT_INJECTION_PATTERNS = [
     r"override\s+(all\s+|the\s+)?(system|safety|security)\s+(rules?|guidelines?|policies?)",
 ]
 
-# Command execution / OS injection attempts
 SYSTEM_COMMAND_PATTERNS = [
     r"\bxp_cmdshell\b",
     r"\b(cmd\.exe|powershell(\.exe)?|/bin/bash|/bin/sh)\b",
@@ -26,7 +24,6 @@ SYSTEM_COMMAND_PATTERNS = [
     r"javascript\s*:",
 ]
 
-# Destructive / mutating SQL commands in user prompt
 DESTRUCTIVE_SQL_PATTERNS = [
     r"\b(drop|truncate)\s+(the\s+)?(table\b|[a-zA-Z0-9_]*table\b|database\b|schema\b)",
     r"\bdelete\s+(all\s+)?(from|rows|records|the)\b",
@@ -34,12 +31,67 @@ DESTRUCTIVE_SQL_PATTERNS = [
     r"\balter\s+table\b",
 ]
 
+OFF_TOPIC_PATTERNS = [
+    r"(?:what|where)\s+is\s+the\s+(capital|president|king|queen|currency|population|language)\s+of\b",
+    r"\bwho\s+(is|was|are|were)\s+(the\s+)?(president|prime\s+minister|king|queen|ceo|founder|inventor)\b",
+    r"\b(tell|teach)\s+me\s+(about|the\s+history|a\s+joke|a\s+story|a\s+poem|a\s+recipe)\b",
+    r"\bwhat\s+is\s+the\s+(meaning|definition)\s+of\b",
+    r"\bdefine\s+the\s+word\b",
+    r"\bwhat\s+does\s+\w+\s+mean\b",
+    # Geography / science / history trivia
+    r"\b(tallest|longest|biggest|smallest|deepest|highest)\s+(mountain|river|ocean|building|country|city|lake|desert)\b",
+    r"\bwhat\s+(year|date)\s+(did|was)\b.{0,30}\b(born|die|invent|discover|found|happen)\b",
+    r"\bhow\s+far\s+is\s+(it\s+from|the\s+distance)\b",
+    # Creative / conversational
+    r"\bwrite\s+(me\s+)?(a|an|the)\s+(poem|essay|story|song|letter|email|code|script|function)\b",
+    r"\b(compose|generate|create)\s+(a|an|the)\s+(poem|essay|story|song|haiku)\b",
+    r"\btranslate\s+.{1,50}\s+(to|into)\s+(english|french|spanish|german|hindi|arabic|chinese|japanese)\b",
+    r"\bsolve\s+(this|the)\s+(math|equation|problem|riddle|puzzle)\b",
+    # Coding help
+    r"\b(write|give\s+me|show\s+me)\s+(a\s+)?(python|java|javascript|c\+\+|html|css|react|code)\b",
+    r"\bhow\s+to\s+(code|program|implement|build)\s+(a|an|in)\b",
+    # Conversational / personal
+    r"\b(who|what)\s+are\s+you\b",
+    r"\bwhat\s+is\s+your\s+(name|purpose|favorite)\b",
+    r"\btell\s+me\s+a\s+joke\b",
+    r"\bsing\s+(me\s+)?a\s+song\b",
+]
+
+DATA_RELEVANCE_KEYWORDS = [
+    r"\b(column|row|table|field|record|data_table|dataset|csv|excel|database|schema)\b",
+    r"\b(average|mean|median|sum|count|total|max|min|std|deviation|variance|percentage|percent)\b",
+    r"\b(group\s+by|order\s+by|sort\s+by|filter|where|having|distinct|unique|null|missing)\b",
+    r"\b(trend|distribution|correlation|outlier|anomaly|breakdown|compare|comparison|versus|vs)\b",
+    r"\b(chart|graph|plot|visuali[sz]e|histogram|bar\s+chart|pie\s+chart|scatter)\b",
+    r"\b(top\s+\d+|bottom\s+\d+|highest|lowest|most|least|rank|ranking)\b",
+    r"\b(sales|revenue|profit|cost|price|quantity|amount|budget|expense|income|growth)\b",
+    r"\b(customer|product|order|employee|transaction|invoice|payment|shipment|category)\b",
+    r"\b(date|month|year|quarter|week|daily|monthly|yearly|annual|seasonal|time\s*series)\b",
+    r"\b(show\s+me|list|display|give\s+me|find|search|look\s+up|get|fetch|query)\b",
+    r"\b(how\s+many|how\s+much|what\s+is\s+the\s+(total|average|sum|count))\b",
+]
+
+_REFUSAL_MSG = (
+    "I'm a data analysis assistant — I can only answer questions about your "
+    "uploaded dataset or connected database. Please ask a question related to "
+    "your data (e.g. trends, totals, comparisons, filtering, charts)."
+)
+
 MAX_PROMPT_LENGTH = 2500
+
+
+def _is_data_relevant(prompt: str) -> bool:
+    """Return True if the prompt contains data-analysis keywords."""
+    for pattern in DATA_RELEVANCE_KEYWORDS:
+        if re.search(pattern, prompt, re.IGNORECASE):
+            return True
+    return False
 
 
 def validate_input(prompt: str) -> Tuple[bool, Optional[str]]:
     """
-    Validates user input against prompt injection, malicious commands, and structural anomalies.
+    Validates user input against prompt injection, malicious commands,
+    structural anomalies, and off-topic / general-knowledge questions.
 
     Returns:
         (is_safe, refusal_reason)
@@ -76,67 +128,9 @@ def validate_input(prompt: str) -> Tuple[bool, Optional[str]]:
                 "Only read-only analytical questions are permitted."
             )
 
+    if not _is_data_relevant(clean_prompt):
+        for pattern in OFF_TOPIC_PATTERNS:
+            if re.search(pattern, clean_prompt, re.IGNORECASE):
+                return False, _REFUSAL_MSG
+
     return True, None
-
-
-def check_relevance(question: str, schema_info: str, llm) -> Tuple[bool, Optional[str]]:
-    """
-    Uses a lightweight LLM call to check whether the user's question is relevant
-    to the connected dataset. This prevents the agent from answering general
-    knowledge questions, trivia, or anything unrelated to the data.
-
-    Args:
-        question: The user's question.
-        schema_info: The dataset schema description (tables, columns, types).
-        llm: The LLM instance to use for the relevance check.
-
-    Returns:
-        (is_relevant, refusal_reason)
-    """
-    from langchain_core.messages import HumanMessage, SystemMessage
-
-    relevance_prompt = f"""You are a strict relevance classifier for a data analytics agent.
-
-The user has connected a dataset with the following schema:
-{schema_info}
-
-Your ONLY job is to decide whether the user's question can be answered by querying this dataset.
-
-A question is RELEVANT if:
-- It asks about data, values, counts, trends, summaries, statistics, or patterns that exist in the dataset columns/tables
-- It asks to filter, sort, group, aggregate, or compare data from the dataset
-- It references column names, table names, or data values that could plausibly exist in the dataset
-- It asks about the structure of the dataset (e.g., "what columns are there", "how many rows")
-
-A question is OFF-TOPIC if:
-- It asks general knowledge questions (e.g., "What is the capital of France?", "Who is the president?")
-- It asks about topics completely unrelated to the dataset (e.g., weather, sports scores, history, science, coding help)
-- It asks you to write code, poems, stories, or do tasks unrelated to data analysis
-- It asks about things that cannot possibly be answered from the dataset tables/columns
-
-Respond with EXACTLY one word: RELEVANT or OFFTOPIC
-
-User question: {question}"""
-
-    try:
-        response = llm.invoke([
-            SystemMessage(content="You are a strict relevance classifier. Respond with exactly one word: RELEVANT or OFFTOPIC"),
-            HumanMessage(content=relevance_prompt),
-        ])
-
-        result = response.content.strip().upper()
-
-        if "OFFTOPIC" in result:
-            return False, (
-                "I can only answer questions related to your connected dataset. "
-                "Your question doesn't appear to be about the data you've uploaded. "
-                "Please ask something about your data — for example, try asking about "
-                "specific columns, trends, counts, or summaries from your dataset."
-            )
-
-        return True, None
-
-    except Exception as e:
-        # If the relevance check fails, let the question through rather than blocking
-        print(f"RELEVANCE CHECK: Error ({e}), allowing question through")
-        return True, None
