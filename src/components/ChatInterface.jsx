@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
-import { Send, Loader2, Bot, User, Code, FileDown } from 'lucide-react';
+import { Send, Loader2, Bot, User, Code, FileDown, Brain, Coins } from 'lucide-react';
 import MessageBubble from './MessageBubble';
 import botImg from '../assets/bot.png';
 
@@ -14,6 +14,9 @@ export default function ChatInterface({ dataset, onOpenSidebar }) {
   ]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [useReasoning, setUseReasoning] = useState(false);
+  const [totalCost, setTotalCost] = useState(0);
+  const [totalTokens, setTotalTokens] = useState(0);
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -38,18 +41,27 @@ export default function ChatInterface({ dataset, onOpenSidebar }) {
         message: userMessage,
         session_id: 'default',
         dataset_path: dataset.dataset_path || '',
-        db_uri: dataset.db_uri || ''
+        db_uri: dataset.db_uri || '',
+        use_reasoning: useReasoning
       });
 
       const data = response.data;
       const newMessages = [];
+
+      if (data.token_financials) {
+        setTotalCost(prev => prev + (data.token_financials.estimated_cost_usd || 0));
+        setTotalTokens(prev => prev + (data.token_financials.total_tokens || 0));
+      }
       
       if (data.answer) {
         newMessages.push({
           role: 'assistant',
           content: data.answer,
           type: 'text',
-          query: data.query_executed
+          query: data.query_executed,
+          tags: data.tags,
+          token_financials: data.token_financials,
+          reasoning: data.reasoning_content
         });
       }
 
@@ -109,10 +121,35 @@ export default function ChatInterface({ dataset, onOpenSidebar }) {
             <h2 className="font-semibold text-slate-200">Analytics Agent</h2>
           </div>
         </div>
-        <button onClick={() => window.print()} className="flex items-center gap-2 text-slate-400 hover:text-indigo-400 transition-colors text-sm px-3 py-1.5 rounded-md hover:bg-slate-800 print:hidden">
-          <FileDown className="w-4 h-4" />
-          Export PDF
-        </button>
+
+        <div className="flex items-center gap-2.5 print:hidden">
+          {totalTokens > 0 && (
+            <div className="hidden sm:flex items-center gap-1.5 text-xs text-slate-400 bg-slate-900/80 border border-slate-700/60 px-2.5 py-1.5 rounded-lg shadow-inner">
+              <Coins className="w-3.5 h-3.5 text-amber-400" />
+              <span>{totalTokens.toLocaleString()} tokens</span>
+              <span className="text-emerald-400 font-mono">(${totalCost.toFixed(5)})</span>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setUseReasoning(!useReasoning)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+              useReasoning
+                ? 'bg-purple-500/20 text-purple-300 border border-purple-500/50 shadow-sm shadow-purple-500/20'
+                : 'bg-slate-800/80 text-slate-400 hover:text-slate-200 border border-slate-700/50'
+            }`}
+            title={useReasoning ? "Reasoning model active (deep analytical thinking)" : "Switch to reasoning model"}
+          >
+            <Brain className={`w-3.5 h-3.5 ${useReasoning ? 'text-purple-400 animate-pulse' : 'text-slate-400'}`} />
+            <span>{useReasoning ? 'Reasoning Model' : 'Fast Mode'}</span>
+          </button>
+
+          <button onClick={() => window.print()} className="flex items-center gap-2 text-slate-400 hover:text-indigo-400 transition-colors text-sm px-3 py-1.5 rounded-md hover:bg-slate-800">
+            <FileDown className="w-4 h-4" />
+            Export PDF
+          </button>
+        </div>
       </header>
 
       <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-6 custom-scrollbar print:overflow-visible print:h-auto print:block">

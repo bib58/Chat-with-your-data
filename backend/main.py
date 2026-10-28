@@ -120,22 +120,49 @@ async def connect_database(request: ConnectRequest):
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     if request.db_uri:
-        result = process_chat(request.message, dataset_path="", db_uri=request.db_uri)
+        result = process_chat(
+            request.message,
+            dataset_path="",
+            db_uri=request.db_uri,
+            use_reasoning=request.use_reasoning,
+            model_name=request.model_name
+        )
     elif request.dataset_path and os.path.exists(request.dataset_path):
-        result = process_chat(request.message, dataset_path=request.dataset_path)
+        result = process_chat(
+            request.message,
+            dataset_path=request.dataset_path,
+            use_reasoning=request.use_reasoning,
+            model_name=request.model_name
+        )
     else:
         raise HTTPException(status_code=400, detail="No data source provided. Upload a file or connect to SQL Server.")
         
     if result.get("error"):
         error_msg = result.get("final_answer") or f"Error: {result['error']}"
-        return ChatResponse(answer=error_msg, table_data=None, chart_config=None, query_executed=result.get("sql_query"))
+        return ChatResponse(
+            answer=error_msg,
+            table_data=None,
+            chart_config=None,
+            query_executed=result.get("sql_query"),
+            tags=result.get("tags"),
+            token_financials=result.get("token_financials"),
+            reasoning_content=result.get("reasoning_content")
+        )
 
     if result.get("off_topic"):
         raw_answer = result.get("final_answer", "I'm a data analysis assistant — I can only answer questions about your uploaded dataset.")
         answer_str = str(raw_answer) if not isinstance(raw_answer, list) else "\n".join(
             part.get("text", str(part)) if isinstance(part, dict) else str(part) for part in raw_answer
         )
-        return ChatResponse(answer=answer_str, table_data=None, chart_config=None, query_executed=None)
+        return ChatResponse(
+            answer=answer_str,
+            table_data=None,
+            chart_config=None,
+            query_executed=None,
+            tags=result.get("tags"),
+            token_financials=result.get("token_financials"),
+            reasoning_content=result.get("reasoning_content")
+        )
 
     execution_result = result.get("execution_result")
     table_data = None
@@ -165,5 +192,8 @@ async def chat(request: ChatRequest):
         answer=answer_str,
         table_data=table_data,
         chart_config=chart_cfg,
-        query_executed=result.get("sql_query")
+        query_executed=result.get("sql_query"),
+        tags=result.get("tags"),
+        token_financials=result.get("token_financials"),
+        reasoning_content=result.get("reasoning_content")
     )
