@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { User, Code, BarChart3, Table as TableIcon, Copy, Check } from 'lucide-react';
+import { User, Code, BarChart3, Table as TableIcon, Copy, Check, Brain, ChevronDown, ChevronUp, Coins, Tag } from 'lucide-react';
 import botImg from '../assets/bot.png';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -11,6 +11,7 @@ export default function MessageBubble({ message }) {
   const isUser = message.role === 'user';
   const [copied, setCopied] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
+  const [showReasoning, setShowReasoning] = useState(false);
 
   const handleCopy = async () => {
     let textToCopy = message.content || '';
@@ -77,6 +78,31 @@ export default function MessageBubble({ message }) {
 
       <div className={`flex flex-col gap-2.5 min-w-0 max-w-full ${isUser ? 'items-end' : 'items-start'}`}>
 
+        {!isUser && message.reasoning && (
+          <div className="w-full bg-slate-900/90 border border-purple-500/30 rounded-xl overflow-hidden shadow-md">
+            <button
+              onClick={() => setShowReasoning(!showReasoning)}
+              className="w-full flex items-center justify-between px-4 py-2.5 text-xs font-medium text-purple-300 hover:text-purple-200 bg-purple-950/20 hover:bg-purple-900/30 transition-colors cursor-pointer"
+            >
+              <div className="flex items-center gap-2">
+                <Brain className="w-4 h-4 text-purple-400" />
+                <span className="font-semibold tracking-wide">Thinking Process</span>
+                {message.token_financials?.reasoning_tokens > 0 && (
+                  <span className="text-[10px] text-purple-300/70 font-mono">
+                    ({message.token_financials.reasoning_tokens} reasoning tokens)
+                  </span>
+                )}
+              </div>
+              {showReasoning ? <ChevronUp className="w-4 h-4 text-purple-400" /> : <ChevronDown className="w-4 h-4 text-purple-400" />}
+            </button>
+            {showReasoning && (
+              <div className="px-4 py-3 text-xs font-mono text-slate-300 bg-slate-950/80 border-t border-purple-500/20 whitespace-pre-wrap leading-relaxed max-h-60 overflow-y-auto">
+                {message.reasoning}
+              </div>
+            )}
+          </div>
+        )}
+
         {message.type === 'text' && message.content && (
           <div className={`group relative px-5 py-4 rounded-2xl shadow-sm text-[14.5px] leading-relaxed transition-all ${isUser
               ? 'bg-linear-to-br from-indigo-500 to-purple-600 text-white rounded-tr-sm shadow-lg shadow-indigo-500/20 pr-11'
@@ -114,54 +140,22 @@ export default function MessageBubble({ message }) {
                   h3: ({ node, ...props }) => (
                     <h3 className={`text-[15px] font-semibold mt-3 mb-1.5 first:mt-0 ${isUser ? 'text-white' : 'text-indigo-300'}`} {...props} />
                   ),
-                  h4: ({ node, ...props }) => (
-                    <h4 className="text-sm font-semibold text-slate-200 mt-2 mb-1 first:mt-0" {...props} />
-                  ),
-                  p: ({ node, ...props }) => (
-                    <p className={`mb-2.5 last:mb-0 leading-relaxed ${isUser ? 'text-white' : 'text-slate-200'}`} {...props} />
-                  ),
-                  ul: ({ node, ...props }) => (
-                    <ul className="list-disc list-outside pl-5 mb-3 space-y-1 text-slate-300 last:mb-0" {...props} />
-                  ),
-                  ol: ({ node, ...props }) => (
-                    <ol className="list-decimal list-outside pl-5 mb-3 space-y-1 text-slate-300 last:mb-0" {...props} />
-                  ),
-                  li: ({ node, ...props }) => (
-                    <li className="leading-relaxed pl-0.5" {...props} />
-                  ),
-                  strong: ({ node, ...props }) => (
-                    <strong className="font-semibold text-white" {...props} />
-                  ),
-                  em: ({ node, ...props }) => (
-                    <em className="italic text-slate-300" {...props} />
-                  ),
-                  hr: ({ node, ...props }) => (
-                    <hr className="my-3.5 border-t border-slate-700/60" {...props} />
-                  ),
+                  p: ({ node, ...props }) => <p className="mb-2.5 last:mb-0 leading-relaxed text-slate-200" {...props} />,
+                  ul: ({ node, ...props }) => <ul className="list-disc pl-5 my-2.5 space-y-1 text-slate-200" {...props} />,
+                  ol: ({ node, ...props }) => <ol className="list-decimal pl-5 my-2.5 space-y-1 text-slate-200" {...props} />,
+                  li: ({ node, ...props }) => <li className="pl-1 text-slate-200" {...props} />,
+                  strong: ({ node, ...props }) => <strong className="font-semibold text-indigo-200" {...props} />,
+                  em: ({ node, ...props }) => <em className="italic text-slate-300" {...props} />,
+                  code: ({ node, inline, ...props }) =>
+                    inline ? (
+                      <code className="px-1.5 py-0.5 rounded bg-slate-900/80 text-indigo-300 text-[13px] font-mono border border-slate-700/60" {...props} />
+                    ) : (
+                      <div className="overflow-x-auto my-3 rounded-lg border border-slate-700/60 bg-slate-950/80">
+                        <code className="block p-3 text-xs font-mono text-indigo-200 leading-normal" {...props} />
+                      </div>
+                    ),
                   blockquote: ({ node, ...props }) => (
-                    <blockquote className="border-l-4 border-indigo-500/70 pl-3 py-1.5 my-2.5 text-slate-300 italic bg-slate-900/40 rounded-r-md" {...props} />
-                  ),
-                  code: ({ node, inline, className, children, ...props }) => {
-                    const match = /language-(\w+)/.exec(className || '');
-                    const isInlineCode = inline ?? (!match && !String(children).includes('\n'));
-                    if (isInlineCode) {
-                      return (
-                        <code className={`px-1.5 py-0.5 mx-0.5 rounded font-mono text-[13px] ${isUser
-                            ? 'bg-indigo-700/70 text-indigo-100 border border-indigo-500/40'
-                            : 'bg-slate-900/90 text-indigo-300 border border-slate-700/60'
-                          }`} {...props}>
-                          {children}
-                        </code>
-                      );
-                    }
-                    return (
-                      <code className={`block font-mono text-xs text-emerald-300 ${className || ''}`} {...props}>
-                        {children}
-                      </code>
-                    );
-                  },
-                  pre: ({ node, ...props }) => (
-                    <pre className="p-4 my-3 rounded-xl bg-slate-950/90 border border-slate-800/80 overflow-x-auto text-[13px] leading-relaxed font-mono custom-scrollbar shadow-inner" {...props} />
+                    <blockquote className="border-l-4 border-indigo-500/60 pl-3 my-2.5 italic text-slate-400" {...props} />
                   ),
                   table: ({ node, ...props }) => (
                     <div className="overflow-x-auto my-3 rounded-lg border border-slate-700/60">
@@ -178,6 +172,37 @@ export default function MessageBubble({ message }) {
                 {message.content}
               </ReactMarkdown>
             </div>
+
+            {!isUser && message.tags && message.tags.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5 mt-3 pt-2.5 border-t border-slate-700/40">
+                {message.tags.map((tag, idx) => (
+                  <span
+                    key={idx}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-900/60 text-slate-300 border border-slate-700/60"
+                  >
+                    <Tag className="w-2.5 h-2.5 text-indigo-400" />
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {!isUser && message.token_financials && (
+              <div className="flex flex-wrap items-center gap-2 mt-2 pt-2 border-t border-slate-700/30 text-[11px] text-slate-400">
+                <span className="flex items-center gap-1 text-slate-300 font-mono font-medium">
+                  <Coins className="w-3 h-3 text-amber-400" />
+                  {message.token_financials.total_tokens?.toLocaleString()} tokens
+                </span>
+                <span className="text-slate-600">·</span>
+                <span className="text-emerald-400 font-mono font-semibold">
+                  ${Number(message.token_financials.estimated_cost_usd || 0).toFixed(6)}
+                </span>
+                <span className="text-slate-600 hidden sm:inline">·</span>
+                <span className="text-slate-400 text-[10px] hidden sm:inline">
+                  (prompt: {message.token_financials.prompt_tokens}, comp: {message.token_financials.completion_tokens})
+                </span>
+              </div>
+            )}
           </div>
         )}
 

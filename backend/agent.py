@@ -15,14 +15,26 @@ warnings.filterwarnings("ignore", module="langchain_google_genai")
 load_dotenv()
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
+try:
+    from .pricing import calculate_token_financials
+except ImportError:
+    from pricing import calculate_token_financials
+
 _api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
 _model_name = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
+_reasoning_model_name = os.getenv("GEMINI_REASONING_MODEL", "gemini-2.5-pro")
 
-LLM = ChatGoogleGenerativeAI(
-    model=_model_name,
-    google_api_key=_api_key or "placeholder_key",
-    temperature=0,
-)
+def get_llm(use_reasoning: bool = False, custom_model: Optional[str] = None):
+    """Returns the configured LLM instance and model identifier."""
+    chosen_model = custom_model or (_reasoning_model_name if use_reasoning else _model_name)
+    llm = ChatGoogleGenerativeAI(
+        model=chosen_model,
+        google_api_key=_api_key or "placeholder_key",
+        temperature=0,
+    )
+    return llm, chosen_model
+
+LLM, _ = get_llm()
 
 ENABLE_GUARDRAILS = os.getenv("ENABLE_GUARDRAILS", "true").lower() in ("true", "1", "yes")
 
@@ -37,6 +49,8 @@ class GraphState(TypedDict, total=False):
     question: str
     dataset_path: str
     db_uri: str
+    use_reasoning: bool
+    model_name: Optional[str]
     df_info: str
     allowed_tables: Optional[List[str]]
     sql_query: str
@@ -47,8 +61,18 @@ class GraphState(TypedDict, total=False):
     final_answer: str
     error: str
     off_topic: bool
+    tags: List[str]
+    token_financials: Optional[Dict[str, Any]]
+    reasoning_content: Optional[str]
 
 class QueryAndAnswer(BaseModel):
+    reasoning_steps: Optional[str] = Field(
+        default=None,
+        description=(
+            "Detailed step-by-step thinking process explaining how you analyzed the schema, "
+            "selected the relevant columns/filters/aggregations, and planned the query."
+        )
+    )
     sql_query: str = Field(
         description=(
             "The SQLite query to answer the user's question. "
@@ -194,15 +218,21 @@ def analyze_dataset_node(state: GraphState):
 
 
 def generate_query_and_answer_node(state: GraphState):
-    """Single LLM call → SQL + chart decision + answer sketch."""
+    """Single LLM call → SQL + chart decision + answer sketch + reasoning + token financials."""
     if state.get("error"):
         return state
 
     start = time.perf_counter()
 
-    llm_structured = LLM.with_structured_output(QueryAndAnswer)
+    use_reasoning = state.get("use_reasoning", False)
+    custom_model = state.get("model_name")
+    active_llm, active_model_name = get_llm(use_reasoning=use_reasoning, custom_model=custom_model)
+
+    llm_structured = active_llm.with_structured_output(QueryAndAnswer, include_raw=True)
 
     sql_dialect = state.get("sql_dialect", "sqlite")
+    mode_tag = "Reasoning Model" if use_reasoning else "Standard Model"
+    tags = [active_model_name, f"dialect:{sql_dialect}", mode_tag, "SQL Generation"]
     
     if sql_dialect == "tsql":
         dialect_instructions = (
@@ -242,19 +272,71 @@ def generate_query_and_answer_node(state: GraphState):
         "don't list every row — just state the insight."
     )
 
+    if use_reasoning:
+        system_prompt += (
+            "\n\nREASONING INSTRUCTIONS:\n"
+            "- Analyze the schema deeply, identify needed columns, handle possible edge cases (NULLs, types).\n"
+            "- Write your detailed chain of thought in 'reasoning_steps' before providing the final SQL."
+        )
+
     user_prompt = (
         f"Dataset Schema:\n{state.get('df_info', 'N/A')}\n\n"
         f"Question: {state['question']}"
     )
 
     try:
-        response = llm_structured.invoke([
-            SystemMessage(content=system_prompt),
-            HumanMessage(content=user_prompt),
-        ])
+        raw_result = llm_structured.invoke(
+            [
+                SystemMessage(content=system_prompt),
+                HumanMessage(content=user_prompt),
+            ],
+            config={
+                "tags": tags,
+                "metadata": {"dialect": sql_dialect, "model": active_model_name, "use_reasoning": use_reasoning}
+            }
+        )
+
+        raw_msg = raw_result.get("raw") if isinstance(raw_result, dict) else raw_result
+        response = raw_result.get("parsed") if isinstance(raw_result, dict) else raw_result
+
+        if response is None:
+            if hasattr(raw_msg, "tool_calls") and raw_msg.tool_calls:
+                args = raw_msg.tool_calls[0].get("args", {})
+                response = QueryAndAnswer(**args)
+            else:
+                response = QueryAndAnswer(
+                    sql_query="SELECT 1",
+                    chart_needed=False,
+                    answer_sketch="Could not parse structured response."
+                )
+
+        reasoning_content = getattr(response, "reasoning_steps", None)
+        if not reasoning_content and raw_msg:
+            additional = getattr(raw_msg, "additional_kwargs", {})
+            if "reasoning_content" in additional:
+                reasoning_content = str(additional["reasoning_content"])
+
+        usage = getattr(raw_msg, "usage_metadata", {}) or {}
+        prompt_tokens = usage.get("input_tokens", 0)
+        completion_tokens = usage.get("output_tokens", 0)
+        output_details = usage.get("output_token_details", {}) or {}
+        reasoning_tokens = output_details.get("reasoning", 0) if isinstance(output_details, dict) else 0
+
+        if not prompt_tokens and raw_msg:
+            resp_meta = getattr(raw_msg, "response_metadata", {}) or {}
+            token_usage = resp_meta.get("token_usage", {}) or {}
+            prompt_tokens = token_usage.get("prompt_tokens", 0)
+            completion_tokens = token_usage.get("completion_tokens", 0)
+
+        token_financials = calculate_token_financials(
+            model_name=active_model_name,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            reasoning_tokens=reasoning_tokens,
+        )
 
         elapsed = time.perf_counter() - start
-        print(f"LLM (single call): {elapsed:.2f}s")
+        print(f"LLM (single call): {elapsed:.2f}s | Model: {active_model_name} | Tokens: {token_financials['total_tokens']} (${token_financials['estimated_cost_usd']})")
         print(f"SQL ({sql_dialect}): {response.sql_query}")
         print(f"Chart: {response.chart_needed}")
 
@@ -265,6 +347,9 @@ def generate_query_and_answer_node(state: GraphState):
             "chart_needed": response.chart_needed if not is_off_topic else False,
             "final_answer": response.answer_sketch,
             "off_topic": is_off_topic,
+            "tags": tags,
+            "token_financials": token_financials,
+            "reasoning_content": reasoning_content,
         }
 
     except Exception as e:
@@ -417,11 +502,19 @@ workflow.add_edge("output_guardrail", END)
 
 app = workflow.compile()
 
-def process_chat(question: str, dataset_path: str = "", db_uri: str = ""):
+def process_chat(
+    question: str,
+    dataset_path: str = "",
+    db_uri: str = "",
+    use_reasoning: bool = False,
+    model_name: Optional[str] = None
+):
     initial_state = {
         "question": question,
         "dataset_path": dataset_path,
         "db_uri": db_uri,
+        "use_reasoning": use_reasoning,
+        "model_name": model_name,
         "error": "",
     }
     result = app.invoke(initial_state)
