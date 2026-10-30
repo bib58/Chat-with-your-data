@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
-import { Send, Loader2, Bot, User, Code, FileDown, Brain, Coins } from 'lucide-react';
+import { Send, Loader2, FileDown, Sparkles } from 'lucide-react';
 import MessageBubble from './MessageBubble';
 import botImg from '../assets/bot.png';
 
@@ -14,9 +14,8 @@ export default function ChatInterface({ dataset, onOpenSidebar }) {
   ]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const [useReasoning, setUseReasoning] = useState(false);
-  const [totalCost, setTotalCost] = useState(0);
   const [totalTokens, setTotalTokens] = useState(0);
+  const [modelName, setModelName] = useState('gemini-3.5-flash-lite');
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -41,16 +40,17 @@ export default function ChatInterface({ dataset, onOpenSidebar }) {
         message: userMessage,
         session_id: 'default',
         dataset_path: dataset.dataset_path || '',
-        db_uri: dataset.db_uri || '',
-        use_reasoning: useReasoning
+        db_uri: dataset.db_uri || ''
       });
 
       const data = response.data;
       const newMessages = [];
 
       if (data.token_financials) {
-        setTotalCost(prev => prev + (data.token_financials.estimated_cost_usd || 0));
         setTotalTokens(prev => prev + (data.token_financials.total_tokens || 0));
+        if (data.token_financials.model_name) {
+          setModelName(data.token_financials.model_name);
+        }
       }
       
       if (data.answer) {
@@ -59,9 +59,7 @@ export default function ChatInterface({ dataset, onOpenSidebar }) {
           content: data.answer,
           type: 'text',
           query: data.query_executed,
-          tags: data.tags,
-          token_financials: data.token_financials,
-          reasoning: data.reasoning_content
+          token_financials: data.token_financials
         });
       }
 
@@ -124,28 +122,13 @@ export default function ChatInterface({ dataset, onOpenSidebar }) {
 
         <div className="flex items-center gap-2.5 print:hidden">
           {totalTokens > 0 && (
-            <div className="hidden sm:flex items-center gap-1.5 text-xs text-slate-400 bg-slate-900/80 border border-slate-700/60 px-2.5 py-1.5 rounded-lg shadow-inner">
-              <Coins className="w-3.5 h-3.5 text-amber-400" />
-              <span>{totalTokens.toLocaleString()} tokens</span>
-              <span className="text-emerald-400 font-mono">(${totalCost.toFixed(5)})</span>
+            <div className="hidden sm:flex items-center gap-1.5 text-xs text-slate-300 bg-slate-900/80 border border-slate-700/60 px-2.5 py-1.5 rounded-lg shadow-inner">
+              <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+              <span className="font-mono">{totalTokens.toLocaleString()} tokens</span>
             </div>
           )}
 
-          <button
-            type="button"
-            onClick={() => setUseReasoning(!useReasoning)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-              useReasoning
-                ? 'bg-purple-500/20 text-purple-300 border border-purple-500/50 shadow-sm shadow-purple-500/20'
-                : 'bg-slate-800/80 text-slate-400 hover:text-slate-200 border border-slate-700/50'
-            }`}
-            title={useReasoning ? "Reasoning model active (deep analytical thinking)" : "Switch to reasoning model"}
-          >
-            <Brain className={`w-3.5 h-3.5 ${useReasoning ? 'text-purple-400 animate-pulse' : 'text-slate-400'}`} />
-            <span>{useReasoning ? 'Reasoning Model' : 'Fast Mode'}</span>
-          </button>
-
-          <button onClick={() => window.print()} className="flex items-center gap-2 text-slate-400 hover:text-indigo-400 transition-colors text-sm px-3 py-1.5 rounded-md hover:bg-slate-800">
+          <button onClick={() => window.print()} className="flex items-center gap-2 text-slate-400 hover:text-indigo-400 transition-colors text-sm px-3 py-1.5 rounded-md hover:bg-slate-800 cursor-pointer">
             <FileDown className="w-4 h-4" />
             Export PDF
           </button>
@@ -183,13 +166,25 @@ export default function ChatInterface({ dataset, onOpenSidebar }) {
               className="w-full max-h-32 min-h-11 bg-transparent resize-none text-slate-200 placeholder:text-slate-500 focus:outline-none py-3 px-4"
               rows={1}
             />
-            <button
-              onClick={handleSend}
-              disabled={!input.trim() || isTyping}
-              className="w-12 h-12 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:hover:bg-indigo-600 text-white flex items-center justify-center shrink-0 transition-all duration-300 shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 hover:-translate-y-0.5"
-            >
-              {isTyping ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5 ml-0.5" />}
-            </button>
+            <div className="flex items-center gap-2 pb-0.5 pr-0.5 shrink-0">
+              <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-mono text-slate-300 bg-slate-800/80 border border-slate-700/60 shadow-xs select-none">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                {modelName}
+              </span>
+              <button
+                onClick={handleSend}
+                disabled={!input.trim() || isTyping}
+                className="w-12 h-12 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:hover:bg-indigo-600 text-white flex items-center justify-center shrink-0 transition-all duration-300 shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 hover:-translate-y-0.5 cursor-pointer"
+              >
+                {isTyping ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5 ml-0.5" />}
+              </button>
+            </div>
+          </div>
+          <div className="sm:hidden flex justify-end mt-1.5 px-1">
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-mono text-slate-400 bg-slate-900/60 border border-slate-800">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+              {modelName}
+            </span>
           </div>
         </div>
       </div>

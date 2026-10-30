@@ -67,7 +67,7 @@ export default function Sidebar({ dataset, setDataset, isOpen, setIsOpen }) {
       <div className="p-6 border-b border-slate-800 flex items-center justify-between shrink-0">
         <h2 className="text-xl font-bold bg-clip-text text-transparent bg-linear-to-r from-indigo-400 to-purple-400 flex items-center gap-2">
           <Database className="w-6 h-6 text-indigo-400" />
-          Data Hub
+          Chat with your Data
         </h2>
         <button 
           onClick={() => setIsOpen(false)}

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { User, Code, BarChart3, Table as TableIcon, Copy, Check, Brain, ChevronDown, ChevronUp, Coins, Tag } from 'lucide-react';
+import { User, Code, BarChart3, Table as TableIcon, Copy, Check, Sparkles } from 'lucide-react';
 import botImg from '../assets/bot.png';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -11,7 +11,6 @@ export default function MessageBubble({ message }) {
   const isUser = message.role === 'user';
   const [copied, setCopied] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
-  const [showReasoning, setShowReasoning] = useState(false);
 
   const handleCopy = async () => {
     let textToCopy = message.content || '';
@@ -77,31 +76,6 @@ export default function MessageBubble({ message }) {
       </div>
 
       <div className={`flex flex-col gap-2.5 min-w-0 max-w-full ${isUser ? 'items-end' : 'items-start'}`}>
-
-        {!isUser && message.reasoning && (
-          <div className="w-full bg-slate-900/90 border border-purple-500/30 rounded-xl overflow-hidden shadow-md">
-            <button
-              onClick={() => setShowReasoning(!showReasoning)}
-              className="w-full flex items-center justify-between px-4 py-2.5 text-xs font-medium text-purple-300 hover:text-purple-200 bg-purple-950/20 hover:bg-purple-900/30 transition-colors cursor-pointer"
-            >
-              <div className="flex items-center gap-2">
-                <Brain className="w-4 h-4 text-purple-400" />
-                <span className="font-semibold tracking-wide">Thinking Process</span>
-                {message.token_financials?.reasoning_tokens > 0 && (
-                  <span className="text-[10px] text-purple-300/70 font-mono">
-                    ({message.token_financials.reasoning_tokens} reasoning tokens)
-                  </span>
-                )}
-              </div>
-              {showReasoning ? <ChevronUp className="w-4 h-4 text-purple-400" /> : <ChevronDown className="w-4 h-4 text-purple-400" />}
-            </button>
-            {showReasoning && (
-              <div className="px-4 py-3 text-xs font-mono text-slate-300 bg-slate-950/80 border-t border-purple-500/20 whitespace-pre-wrap leading-relaxed max-h-60 overflow-y-auto">
-                {message.reasoning}
-              </div>
-            )}
-          </div>
-        )}
 
         {message.type === 'text' && message.content && (
           <div className={`group relative px-5 py-4 rounded-2xl shadow-sm text-[14.5px] leading-relaxed transition-all ${isUser
@@ -173,33 +147,15 @@ export default function MessageBubble({ message }) {
               </ReactMarkdown>
             </div>
 
-            {!isUser && message.tags && message.tags.length > 0 && (
-              <div className="flex flex-wrap items-center gap-1.5 mt-3 pt-2.5 border-t border-slate-700/40">
-                {message.tags.map((tag, idx) => (
-                  <span
-                    key={idx}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-900/60 text-slate-300 border border-slate-700/60"
-                  >
-                    <Tag className="w-2.5 h-2.5 text-indigo-400" />
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            )}
-
             {!isUser && message.token_financials && (
-              <div className="flex flex-wrap items-center gap-2 mt-2 pt-2 border-t border-slate-700/30 text-[11px] text-slate-400">
+              <div className="flex flex-wrap items-center gap-2 mt-3 pt-2.5 border-t border-slate-700/40 text-[11px] text-slate-400">
                 <span className="flex items-center gap-1 text-slate-300 font-mono font-medium">
-                  <Coins className="w-3 h-3 text-amber-400" />
+                  <Sparkles className="w-3 h-3 text-indigo-400" />
                   {message.token_financials.total_tokens?.toLocaleString()} tokens
-                </span>
-                <span className="text-slate-600">·</span>
-                <span className="text-emerald-400 font-mono font-semibold">
-                  ${Number(message.token_financials.estimated_cost_usd || 0).toFixed(6)}
                 </span>
                 <span className="text-slate-600 hidden sm:inline">·</span>
                 <span className="text-slate-400 text-[10px] hidden sm:inline">
-                  (prompt: {message.token_financials.prompt_tokens}, comp: {message.token_financials.completion_tokens})
+                  (prompt: {message.token_financials.prompt_tokens}, completion: {message.token_financials.completion_tokens})
                 </span>
               </div>
             )}
@@ -237,8 +193,8 @@ export default function MessageBubble({ message }) {
         )}
 
         {message.type === 'table' && message.data && message.data.length > 0 && (
-          <div className="group relative mt-2 bg-slate-800 border border-slate-700/50 rounded-xl overflow-hidden shadow-lg w-full max-w-full overflow-x-auto">
-            <div className="bg-slate-900/70 px-4 py-2.5 border-b border-slate-700/50 flex items-center justify-between text-sm text-slate-300 font-medium">
+          <div className="group relative mt-2 bg-slate-800 border border-slate-700/50 rounded-xl p-4 overflow-hidden shadow-lg w-full max-w-full overflow-x-auto">
+            <div className="bg-slate-900/70 px-4 py-2.5 border-b border-slate-700/50 flex items-center justify-between text-sm text-slate-300 font-medium -mx-4 -mt-4 mb-3">
               <div className="flex items-center gap-2">
                 <TableIcon className="w-4 h-4 text-indigo-400" /> Data View
               </div>

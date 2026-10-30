@@ -124,14 +124,12 @@ async def chat(request: ChatRequest):
             request.message,
             dataset_path="",
             db_uri=request.db_uri,
-            use_reasoning=request.use_reasoning,
             model_name=request.model_name
         )
     elif request.dataset_path and os.path.exists(request.dataset_path):
         result = process_chat(
             request.message,
             dataset_path=request.dataset_path,
-            use_reasoning=request.use_reasoning,
             model_name=request.model_name
         )
     else:
