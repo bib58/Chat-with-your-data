@@ -161,10 +161,6 @@ export default function ChatInterface({ dataset, onOpenSidebar }) {
               rows={1}
             />
             <div className="flex items-center gap-2 pb-0.5 pr-0.5 shrink-0">
-              <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-mono text-slate-300 bg-slate-800/80 border border-slate-700/60 shadow-xs select-none">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                {modelName}
-              </span>
               <button
                 onClick={handleSend}
                 disabled={!input.trim() || isTyping}
