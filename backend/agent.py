@@ -15,11 +15,6 @@ warnings.filterwarnings("ignore", module="langchain_google_genai")
 load_dotenv()
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
-try:
-    from .pricing import calculate_token_financials
-except ImportError:
-    from pricing import calculate_token_financials
-
 _api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
 _model_name = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
 
@@ -295,8 +290,6 @@ def generate_query_and_answer_node(state: GraphState):
         usage = getattr(raw_msg, "usage_metadata", {}) or {}
         prompt_tokens = usage.get("input_tokens", 0)
         completion_tokens = usage.get("output_tokens", 0)
-        output_details = usage.get("output_token_details", {}) or {}
-        reasoning_tokens = output_details.get("reasoning", 0) if isinstance(output_details, dict) else 0
 
         if not prompt_tokens and raw_msg:
             resp_meta = getattr(raw_msg, "response_metadata", {}) or {}
@@ -304,15 +297,18 @@ def generate_query_and_answer_node(state: GraphState):
             prompt_tokens = token_usage.get("prompt_tokens", 0)
             completion_tokens = token_usage.get("completion_tokens", 0)
 
-        token_financials = calculate_token_financials(
-            model_name=active_model_name,
-            prompt_tokens=prompt_tokens,
-            completion_tokens=completion_tokens,
-            reasoning_tokens=reasoning_tokens,
-        )
+        total_tokens = prompt_tokens + completion_tokens
+        token_financials = {
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "reasoning_tokens": 0,
+            "total_tokens": total_tokens,
+            "estimated_cost_usd": 0.0,
+            "model_name": active_model_name,
+        }
 
         elapsed = time.perf_counter() - start
-        print(f"LLM (single call): {elapsed:.2f}s | Model: {active_model_name} | Tokens: {token_financials['total_tokens']}")
+        print(f"LLM (single call): {elapsed:.2f}s | Model: {active_model_name} | Tokens: {total_tokens}")
         print(f"SQL ({sql_dialect}): {response.sql_query}")
         print(f"Chart: {response.chart_needed}")
 
