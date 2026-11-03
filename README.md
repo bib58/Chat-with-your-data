@@ -26,6 +26,20 @@ This application lets users explore their data using natural language. Users can
 
 ---
 
+#### LLM Benchmarking
+
+> Used **LLM-stats** leader-boards to evaluate reliable models for text-to-sql
+
+EValuated upon IPL dataset from 2021-2024 by generating 20-sql questions as golden-dataset
+with models:
+- Grok 4.5
+- Gemini 3.8 Flash
+- GPT-5.6 Terra
+- Kimi K3
+- Claude Sonnet 5
+
+---
+
 ## 🛠️ Technology Stack
 
 ### Frontend
@@ -45,17 +59,12 @@ This application lets users explore their data using natural language. Users can
 
 ---
 
-## 🚀 Run the Project
-
-1. Start the FastAPI backend:
-  `uvicorn main:app --reload`
-
-2. Start the Vite frontend:
-  `npm run dev`
-
-3. For production deployment on Render:
+For production deployment on Render:
   `gunicorn main:app --workers 1 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT`
 
 > Use Gunicorn to manage the server process, while Uvicorn runs the FastAPI application itself.
 
 About shutil: it helps clean up temporary files and session artifacts safely after a user interaction ends.
+
+---
+
