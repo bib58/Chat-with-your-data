@@ -30,6 +30,31 @@ SCHEMA_PATH = "schema.sql"
 GOLDEN_PATH = "golden_dataset.csv"
 RESULTS_PATH = "eval_results.csv"
 
+# ---------------------------------------------------------------------------
+# LangSmith – benchmark traces are grouped under a dedicated project so they
+# can be compared separately from live app traces in the LangSmith dashboard.
+# Set LANGCHAIN_PROJECT in your .env to override (e.g. "chat-with-your-data"
+# to merge everything into one project).
+# ---------------------------------------------------------------------------
+try:
+    from langsmith import traceable
+    _LANGSMITH_AVAILABLE = True
+except ImportError:
+    _LANGSMITH_AVAILABLE = False
+    def traceable(*args, **kwargs):
+        def decorator(fn):
+            return fn
+        return decorator if args and callable(args[0]) else decorator
+
+# Default to benchmark-specific project; respects existing env var if already set.
+if "LANGCHAIN_PROJECT" not in os.environ:
+    os.environ["LANGCHAIN_PROJECT"] = "chat-with-data-benchmarks"
+
+_tracing_enabled = os.getenv("LANGCHAIN_TRACING_V2", "false").lower() in ("true", "1", "yes")
+if _tracing_enabled and _LANGSMITH_AVAILABLE:
+    print(f"[LangSmith] Benchmarking traces → project: '{os.environ['LANGCHAIN_PROJECT']}'")
+
+
 def load_schema():
     with open(SCHEMA_PATH, encoding="utf-8") as f:
         return f.read().strip()
@@ -98,6 +123,12 @@ def gold_result_to_df(gold_result_json):
     return pd.DataFrame(obj["rows"], columns=obj["columns"])
 
 
+@traceable(
+    name="llm-benchmark-run",
+    run_type="chain",
+    tags=["benchmark", "text-to-sql"],
+    metadata={"component": "llm-benchmarking"},
+)
 def run_eval():
     schema = load_schema()
     golden = load_golden()

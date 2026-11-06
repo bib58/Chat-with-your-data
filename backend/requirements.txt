@@ -13,3 +13,4 @@ sqlalchemy
 langchain-community
 pymssql
 sqlglot
+langsmith>=0.1.0

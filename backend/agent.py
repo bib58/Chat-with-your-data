@@ -15,6 +15,37 @@ warnings.filterwarnings("ignore", module="langchain_google_genai")
 load_dotenv()
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
+# ---------------------------------------------------------------------------
+# LangSmith – activated automatically via environment variables:
+#   LANGCHAIN_TRACING_V2=true
+#   LANGCHAIN_API_KEY=<your key>
+#   LANGCHAIN_PROJECT=chat-with-your-data
+#   LANGCHAIN_ENDPOINT=https://api.smith.langchain.com
+# All LangChain / LangGraph calls are traced with zero extra instrumentation.
+# ---------------------------------------------------------------------------
+try:
+    from langsmith import traceable
+    from langsmith.run_helpers import get_current_run_tree
+    _LANGSMITH_AVAILABLE = True
+except ImportError:
+    _LANGSMITH_AVAILABLE = False
+    # Provide a no-op fallback so the rest of the code runs even without langsmith
+    def traceable(*args, **kwargs):
+        def decorator(fn):
+            return fn
+        return decorator if args and callable(args[0]) else decorator
+    def get_current_run_tree():
+        return None
+
+_tracing_enabled = os.getenv("LANGCHAIN_TRACING_V2", "false").lower() in ("true", "1", "yes")
+_langsmith_project = os.getenv("LANGCHAIN_PROJECT", "chat-with-your-data")
+if _tracing_enabled and _LANGSMITH_AVAILABLE:
+    print(f"[LangSmith] Tracing ENABLED → project: '{_langsmith_project}'")
+elif _tracing_enabled and not _LANGSMITH_AVAILABLE:
+    print("[LangSmith] LANGCHAIN_TRACING_V2=true but langsmith package not found — tracing disabled.")
+else:
+    print("[LangSmith] Tracing disabled (set LANGCHAIN_TRACING_V2=true to enable).")
+
 _api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
 _model_name = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
 
@@ -261,6 +292,26 @@ def generate_query_and_answer_node(state: GraphState):
         f"Question: {state['question']}"
     )
 
+    # -----------------------------------------------------------------
+    # Build dynamic LangSmith tags – reuses values already in state.
+    # These are forwarded to the LangChain invoke() config so they appear
+    # on the LLM trace in LangSmith. The returned state["tags"] list
+    # (read by the UI) is populated separately below and is unchanged.
+    # -----------------------------------------------------------------
+    execution_mode = "reasoning" if state.get("use_reasoning") else "fast"
+    invoke_tags = [
+        f"model:{active_model_name}",
+        f"dialect:{sql_dialect}",
+        f"mode:{execution_mode}",
+        "task:text-to-sql",
+    ]
+    invoke_metadata = {
+        "model": active_model_name,
+        "dialect": sql_dialect,
+        "execution_mode": execution_mode,
+        "task": "text-to-sql",
+    }
+
     try:
         raw_result = llm_structured.invoke(
             [
@@ -268,8 +319,8 @@ def generate_query_and_answer_node(state: GraphState):
                 HumanMessage(content=user_prompt),
             ],
             config={
-                "tags": [],
-                "metadata": {"dialect": sql_dialect, "model": active_model_name}
+                "tags": invoke_tags,
+                "metadata": invoke_metadata,
             }
         )
 
@@ -287,6 +338,11 @@ def generate_query_and_answer_node(state: GraphState):
                     answer_sketch="Could not parse structured response."
                 )
 
+        # -----------------------------------------------------------------
+        # Token extraction – existing logic unchanged.
+        # We additionally attach the counts to the active LangSmith run
+        # so they appear as run metadata in the dashboard.
+        # -----------------------------------------------------------------
         usage = getattr(raw_msg, "usage_metadata", {}) or {}
         prompt_tokens = usage.get("input_tokens", 0)
         completion_tokens = usage.get("output_tokens", 0)
@@ -307,6 +363,25 @@ def generate_query_and_answer_node(state: GraphState):
             "model_name": active_model_name,
         }
 
+        # Attach token counts to the active LangSmith run tree as metadata.
+        # This surfaces token usage at the graph-node level in the dashboard.
+        # We use a try/except so a missing run tree never breaks the main flow.
+        try:
+            run_tree = get_current_run_tree()
+            if run_tree is not None:
+                run_tree.add_metadata({
+                    "token_usage": {
+                        "prompt_tokens": prompt_tokens,
+                        "completion_tokens": completion_tokens,
+                        "total_tokens": total_tokens,
+                    },
+                    "model_name": active_model_name,
+                    "sql_dialect": sql_dialect,
+                    "execution_mode": execution_mode,
+                })
+        except Exception:
+            pass  # LangSmith metadata attachment is best-effort
+
         elapsed = time.perf_counter() - start
         print(f"LLM (single call): {elapsed:.2f}s | Model: {active_model_name} | Tokens: {total_tokens}")
         print(f"SQL ({sql_dialect}): {response.sql_query}")
@@ -319,13 +394,27 @@ def generate_query_and_answer_node(state: GraphState):
             "chart_needed": response.chart_needed if not is_off_topic else False,
             "final_answer": response.answer_sketch,
             "off_topic": is_off_topic,
-            "tags": [],
+            "tags": invoke_tags,  # surface the same tags to the UI response
             "token_financials": token_financials,
             "reasoning_content": None,
         }
 
     except Exception as e:
-        print(f"LLM: {time.perf_counter() - start:.2f}s")
+        elapsed = time.perf_counter() - start
+        print(f"LLM: {elapsed:.2f}s")
+        # Annotate the active LangSmith run with error details so failed
+        # executions are clearly visible in the dashboard.
+        try:
+            run_tree = get_current_run_tree()
+            if run_tree is not None:
+                run_tree.add_metadata({
+                    "error_stage": "generate_query_and_answer",
+                    "error_message": str(e),
+                    "model_name": active_model_name,
+                    "sql_dialect": sql_dialect,
+                })
+        except Exception:
+            pass
         return {"error": f"Failed to generate query: {str(e)}"}
 
 
@@ -389,6 +478,19 @@ def execute_query_node(state: GraphState):
     except Exception as e:
         print(f"SQL EXEC: {time.perf_counter() - start:.2f}s")
         traceback.print_exc()
+        # Annotate the active LangSmith run so SQL execution failures
+        # are clearly tagged and distinguishable from LLM failures.
+        try:
+            run_tree = get_current_run_tree()
+            if run_tree is not None:
+                run_tree.add_metadata({
+                    "error_stage": "execute_query",
+                    "error_message": str(e),
+                    "sql_query": state.get("sql_query", ""),
+                    "sql_dialect": state.get("sql_dialect", "sqlite"),
+                })
+        except Exception:
+            pass
         return {"error": f"Execution failed: {str(e)}"}
 
 
@@ -473,6 +575,12 @@ workflow.add_edge("output_guardrail", END)
 
 app = workflow.compile()
 
+@traceable(
+    name="process_chat",
+    run_type="chain",
+    tags=["entry-point"],
+    metadata={"component": "chat-with-your-data"},
+)
 def process_chat(
     question: str,
     dataset_path: str = "",
@@ -480,12 +588,63 @@ def process_chat(
     use_reasoning: bool = False,
     model_name: Optional[str] = None
 ):
+    """
+    Top-level entry point traced by LangSmith.
+
+    The @traceable decorator creates a parent run in LangSmith that wraps the
+    entire LangGraph execution (all nodes: input_guardrail → analyze →
+    generate → sql_guardrail → execute → format → output_guardrail).
+    This gives a single, clean trace per user query in the dashboard.
+    """
+    # Build metadata for the top-level LangSmith trace.
+    # Sensitive values (full dataset path) are intentionally omitted.
+    data_source = "sql_server" if db_uri else ("csv_file" if dataset_path else "unknown")
+    execution_mode = "reasoning" if use_reasoning else "fast"
+    chosen_model = model_name or _model_name
+
+    # Attach trace-level metadata to the current run tree.
+    try:
+        run_tree = get_current_run_tree()
+        if run_tree is not None:
+            run_tree.add_metadata({
+                "data_source_type": data_source,
+                "execution_mode": execution_mode,
+                "requested_model": chosen_model,
+            })
+            run_tree.add_tags([
+                f"mode:{execution_mode}",
+                f"source:{data_source}",
+                f"model:{chosen_model}",
+            ])
+    except Exception:
+        pass  # Metadata attachment is best-effort
+
     initial_state = {
         "question": question,
         "dataset_path": dataset_path,
         "db_uri": db_uri,
+        "use_reasoning": use_reasoning,
         "model_name": model_name,
         "error": "",
     }
     result = app.invoke(initial_state)
+
+    # Annotate the top-level run with outcome metadata after the graph finishes.
+    try:
+        run_tree = get_current_run_tree()
+        if run_tree is not None:
+            outcome = "error" if result.get("error") else ("off_topic" if result.get("off_topic") else "success")
+            tf = result.get("token_financials") or {}
+            run_tree.add_metadata({
+                "outcome": outcome,
+                "active_model": tf.get("model_name", chosen_model),
+                "total_tokens": tf.get("total_tokens", 0),
+                "prompt_tokens": tf.get("prompt_tokens", 0),
+                "completion_tokens": tf.get("completion_tokens", 0),
+                "sql_dialect": result.get("sql_dialect", "unknown"),
+                "chart_generated": bool(result.get("chart_config")),
+            })
+    except Exception:
+        pass
+
     return result
