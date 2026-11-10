@@ -18,9 +18,18 @@ except ImportError:
 
 app = FastAPI()
 
+configured_origins = [
+    origin.strip()
+    for origin in os.getenv(
+        "CORS_ORIGINS",
+        "http://localhost:5173,http://localhost:4173,https://data-chit-chat.vercel.app",
+    ).split(",")
+    if origin.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=configured_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -29,23 +38,35 @@ app.add_middleware(
 UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
+
+
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
-    if not file.filename.endswith(('.csv', '.xlsx', '.json')):
+    filename = os.path.basename(file.filename or "")
+    if not filename.lower().endswith((".csv", ".xlsx", ".json")):
         raise HTTPException(status_code=400, detail="Only CSV, Excel, or JSON files are allowed.")
     
-    file_path = os.path.join(UPLOAD_DIR, f"{uuid.uuid4()}_{file.filename}")
+    file_path = os.path.join(UPLOAD_DIR, f"{uuid.uuid4()}_{filename}")
     
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
         
-    return {"dataset_path": file_path, "filename": file.filename}
+    return {"dataset_path": file_path, "filename": filename}
 
 
 @app.post("/cleanup")
 async def cleanup_files(request: CleanupRequest):
     path = request.dataset_path
-    if path and os.path.exists(path) and "uploads" in path:
+    try:
+        is_upload = os.path.commonpath(
+            [os.path.abspath(path), os.path.abspath(UPLOAD_DIR)]
+        ) == os.path.abspath(UPLOAD_DIR)
+    except ValueError:
+        is_upload = False
+    if path and is_upload and os.path.exists(path):
         try:
             os.remove(path)
         except Exception:
@@ -119,18 +140,41 @@ async def connect_database(request: ConnectRequest):
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
+    request_id = request.request_id or str(uuid.uuid4())
     if request.db_uri:
         result = process_chat(
             request.message,
             dataset_path="",
             db_uri=request.db_uri,
-            model_name=request.model_name
+            model_name=request.model_name,
+            request_id=request_id,
+            session_id=request.session_id,
+            langsmith_extra={
+                "metadata": {
+                    "request_id": request_id,
+                    "session_id": request.session_id,
+                    "execution_mode": "sql_server",
+                    "task_type": "text_to_sql",
+                },
+                "tags": ["chat", "sql_server", "text-to-sql"],
+            },
         )
     elif request.dataset_path and os.path.exists(request.dataset_path):
         result = process_chat(
             request.message,
             dataset_path=request.dataset_path,
-            model_name=request.model_name
+            model_name=request.model_name,
+            request_id=request_id,
+            session_id=request.session_id,
+            langsmith_extra={
+                "metadata": {
+                    "request_id": request_id,
+                    "session_id": request.session_id,
+                    "execution_mode": "file_upload",
+                    "task_type": "text_to_sql",
+                },
+                "tags": ["chat", "file_upload", "text-to-sql"],
+            },
         )
     else:
         raise HTTPException(status_code=400, detail="No data source provided. Upload a file or connect to SQL Server.")

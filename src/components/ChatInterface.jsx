@@ -3,6 +3,7 @@ import axios from 'axios';
 import { Send, Loader2, FileDown, Sparkles } from 'lucide-react';
 import MessageBubble from './MessageBubble';
 import botImg from '../assets/bot.png';
+import { requireApiUrl } from '../config';
 
 export default function ChatInterface({ dataset, onOpenSidebar }) {
   const [messages, setMessages] = useState([
@@ -35,12 +36,13 @@ export default function ChatInterface({ dataset, onOpenSidebar }) {
     setIsTyping(true);
 
     try {
-      const API_URL = import.meta.env.VITE_API_URL;
+      const API_URL = requireApiUrl();
       const response = await axios.post(`${API_URL}/chat`, {
         message: userMessage,
         session_id: 'default',
         dataset_path: dataset.dataset_path || '',
-        db_uri: dataset.db_uri || ''
+        db_uri: dataset.db_uri || '',
+        request_id: crypto.randomUUID()
       });
 
       const data = response.data;

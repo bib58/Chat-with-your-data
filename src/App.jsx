@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import ChatInterface from './components/ChatInterface';
+import { requireApiUrl } from './config';
 
 function App() {
   const [dataset, setDataset] = useState(null);
@@ -9,7 +10,7 @@ function App() {
   useEffect(() => {
     const handleBeforeUnload = () => {
       if (dataset && dataset.dataset_path) {
-        const API_URL = import.meta.env.VITE_API_URL;
+        const API_URL = requireApiUrl();
         fetch(`${API_URL}/cleanup`, {
           method: 'POST',
           headers: {

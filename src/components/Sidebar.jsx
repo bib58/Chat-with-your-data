@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import axios from 'axios';
 import { UploadCloud, FileSpreadsheet, CheckCircle2, Loader2, Database, Link, AlertCircle } from 'lucide-react';
+import { requireApiUrl } from '../config';
 
 export default function Sidebar({ dataset, setDataset, isOpen, setIsOpen }) {
   const [isUploading, setIsUploading] = useState(false);
@@ -25,7 +26,7 @@ export default function Sidebar({ dataset, setDataset, isOpen, setIsOpen }) {
     setError('');
 
     try {
-      const API_URL = import.meta.env.VITE_API_URL;
+      const API_URL = requireApiUrl();
       const response = await axios.post(`${API_URL}/upload`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
@@ -49,7 +50,7 @@ export default function Sidebar({ dataset, setDataset, isOpen, setIsOpen }) {
     setError('');
 
     try {
-      const API_URL = import.meta.env.VITE_API_URL;
+      const API_URL = requireApiUrl();
       const response = await axios.post(`${API_URL}/connect`, {
         connection_string: connectionString.trim()
       });
@@ -69,7 +70,7 @@ export default function Sidebar({ dataset, setDataset, isOpen, setIsOpen }) {
           <Database className="w-6 h-6 text-indigo-400" />
           Chat with your Data
         </h2>
-        <button 
+        <button
           onClick={() => setIsOpen(false)}
           className="md:hidden p-2 -mr-2 text-slate-400 hover:text-indigo-400 hover:bg-slate-800/50 rounded-lg transition-colors"
         >

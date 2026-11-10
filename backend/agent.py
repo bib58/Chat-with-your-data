@@ -10,6 +10,24 @@ import warnings
 import traceback
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
+try:
+    from .tracing import (
+        dataset_identifier,
+        model_cost,
+        trace_inputs_without_secrets,
+        trace_outputs_without_secrets,
+        trace_metadata,
+        traceable,
+    )
+except ImportError:
+    from tracing import (
+        dataset_identifier,
+        model_cost,
+        trace_inputs_without_secrets,
+        trace_outputs_without_secrets,
+        trace_metadata,
+        traceable,
+    )
 warnings.filterwarnings("ignore", module="langchain_google_genai")
 
 load_dotenv()
@@ -58,6 +76,10 @@ class GraphState(TypedDict, total=False):
     tags: List[str]
     token_financials: Optional[Dict[str, Any]]
     reasoning_content: Optional[str]
+    request_id: str
+    session_id: str
+    dataset_id: str
+    execution_mode: str
 
 class QueryAndAnswer(BaseModel):
     sql_query: str = Field(
@@ -78,6 +100,13 @@ class QueryAndAnswer(BaseModel):
     )
 
 
+@traceable(
+    name="Input Guardrail",
+    run_type="chain",
+    tags=["guardrail", "input-validation"],
+    process_inputs=trace_inputs_without_secrets,
+    process_outputs=trace_outputs_without_secrets,
+)
 def input_guardrail_node(state: GraphState):
     """Validates user input against prompt injection, jailbreaks, and unsafe commands."""
     if not ENABLE_GUARDRAILS:
@@ -94,6 +123,13 @@ def input_guardrail_node(state: GraphState):
     return {}
 
 
+@traceable(
+    name="Dataset Schema Generation",
+    run_type="chain",
+    tags=["schema", "dataset-analysis"],
+    process_inputs=trace_inputs_without_secrets,
+    process_outputs=trace_outputs_without_secrets,
+)
 def analyze_dataset_node(state: GraphState):
     """Analyze dataset with caching — supports both CSV→SQLite and SQL Server."""
     if state.get("error"):
@@ -204,6 +240,13 @@ def analyze_dataset_node(state: GraphState):
         return {"error": f"Failed to analyze dataset: {str(e)}"}
 
 
+@traceable(
+    name="Query and Schema Preparation",
+    run_type="chain",
+    tags=["query-preparation", "text-to-sql"],
+    process_inputs=trace_inputs_without_secrets,
+    process_outputs=trace_outputs_without_secrets,
+)
 def generate_query_and_answer_node(state: GraphState):
     """Single LLM call → SQL + chart decision + answer sketch + token financials."""
     if state.get("error"):
@@ -298,12 +341,23 @@ def generate_query_and_answer_node(state: GraphState):
             completion_tokens = token_usage.get("completion_tokens", 0)
 
         total_tokens = prompt_tokens + completion_tokens
+        reasoning_tokens = (
+            usage.get("reasoning_tokens")
+            or usage.get("thoughts_tokens")
+            or 0
+        )
+        total_tokens = prompt_tokens + completion_tokens + reasoning_tokens
         token_financials = {
             "prompt_tokens": prompt_tokens,
             "completion_tokens": completion_tokens,
-            "reasoning_tokens": 0,
+            "reasoning_tokens": reasoning_tokens,
             "total_tokens": total_tokens,
-            "estimated_cost_usd": 0.0,
+            "estimated_cost_usd": model_cost(
+                active_model_name,
+                prompt_tokens,
+                completion_tokens,
+                reasoning_tokens,
+            ),
             "model_name": active_model_name,
         }
 
@@ -329,6 +383,13 @@ def generate_query_and_answer_node(state: GraphState):
         return {"error": f"Failed to generate query: {str(e)}"}
 
 
+@traceable(
+    name="SQL Safety Validation",
+    run_type="chain",
+    tags=["guardrail", "sql-validation"],
+    process_inputs=trace_inputs_without_secrets,
+    process_outputs=trace_outputs_without_secrets,
+)
 def sql_guardrail_node(state: GraphState):
     """Validates that the generated SQL is strictly read-only, bounded, and targets valid tables."""
     if not ENABLE_GUARDRAILS or state.get("error"):
@@ -355,6 +416,13 @@ def sql_guardrail_node(state: GraphState):
     return {"sql_query": validated_query}
 
 
+@traceable(
+    name="SQL Query Execution",
+    run_type="tool",
+    tags=["sql-execution", "database"],
+    process_inputs=trace_inputs_without_secrets,
+    process_outputs=trace_outputs_without_secrets,
+)
 def execute_query_node(state: GraphState):
     """Execute the generated SQL against the cached SQLite database."""
     if state.get("error"):
@@ -392,6 +460,13 @@ def execute_query_node(state: GraphState):
         return {"error": f"Execution failed: {str(e)}"}
 
 
+@traceable(
+    name="Final Answer Generation",
+    run_type="chain",
+    tags=["answer-generation", "response-formatting"],
+    process_inputs=trace_inputs_without_secrets,
+    process_outputs=trace_outputs_without_secrets,
+)
 def format_response_node(state: GraphState):
     """Build chart config heuristically and enrich the answer — NO LLM call."""
     if state.get("error"):
@@ -431,6 +506,13 @@ def format_response_node(state: GraphState):
     return {"final_answer": answer, "chart_config": chart_config}
 
 
+@traceable(
+    name="Response Returned to Frontend",
+    run_type="chain",
+    tags=["guardrail", "response"],
+    process_inputs=trace_inputs_without_secrets,
+    process_outputs=trace_outputs_without_secrets,
+)
 def output_guardrail_node(state: GraphState):
     """Sanitizes output text, redacts sensitive PII/secrets, and bounds table payload."""
     if not ENABLE_GUARDRAILS:
@@ -473,19 +555,40 @@ workflow.add_edge("output_guardrail", END)
 
 app = workflow.compile()
 
+@traceable(
+    name="User Query Received",
+    run_type="chain",
+    tags=["chat", "text-to-sql"],
+    process_inputs=trace_inputs_without_secrets,
+    process_outputs=trace_outputs_without_secrets,
+)
 def process_chat(
     question: str,
     dataset_path: str = "",
     db_uri: str = "",
     use_reasoning: bool = False,
-    model_name: Optional[str] = None
+    model_name: Optional[str] = None,
+    request_id: str = "unknown",
+    session_id: str = "unknown",
 ):
+    execution_mode = "sql_server" if db_uri else "file_upload"
     initial_state = {
         "question": question,
         "dataset_path": dataset_path,
         "db_uri": db_uri,
         "model_name": model_name,
+        "request_id": request_id,
+        "session_id": session_id,
+        "dataset_id": dataset_identifier(dataset_path, db_uri),
+        "execution_mode": execution_mode,
+        "sql_dialect": "tsql" if db_uri else "sqlite",
         "error": "",
     }
-    result = app.invoke(initial_state)
+    result = app.invoke(
+        initial_state,
+        config={
+            "tags": ["chat", execution_mode, "text-to-sql"],
+            "metadata": trace_metadata(initial_state),
+        },
+    )
     return result

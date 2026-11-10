@@ -8,6 +8,7 @@ class ChatRequest(BaseModel):
     db_uri: str = ""
     use_reasoning: bool = False
     model_name: Optional[str] = None
+    request_id: Optional[str] = None
 
 class ConnectRequest(BaseModel):
     connection_string: str
@@ -23,7 +24,7 @@ class TokenFinancials(BaseModel):
     completion_tokens: int = 0
     reasoning_tokens: int = 0
     total_tokens: int = 0
-    estimated_cost_usd: float = 0.0
+    estimated_cost_usd: Optional[float] = None
     model_name: str = ""
 
 class ChatResponse(BaseModel):

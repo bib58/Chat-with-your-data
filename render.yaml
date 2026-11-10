@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: chat-with-your-data-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn main:app --workers 1 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.2
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-3.5-flash-lite
+      - key: ENABLE_GUARDRAILS
+        value: "true"
+      - key: CORS_ORIGINS
+        sync: false
+      - key: LANGSMITH_API_KEY
+        sync: false
+      - key: LANGSMITH_TRACING
+        value: "true"
+      - key: LANGSMITH_TRACING_V2
+        value: "true"
+      - key: LANGSMITH_PROJECT
+        value: chat-with-your-data-production

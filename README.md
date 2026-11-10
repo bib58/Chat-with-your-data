@@ -66,5 +66,29 @@ For production deployment on Render:
 
 About shutil: it helps clean up temporary files and session artifacts safely after a user interaction ends.
 
----
+### Environment and deployment
 
+Copy [.env.example](./.env.example) to a local environment file for development. Do not
+commit `.env` files or API keys.
+
+For the Render backend, set `GOOGLE_API_KEY`, `CORS_ORIGINS` (including the deployed
+frontend origin), `LANGSMITH_API_KEY`, and `LANGSMITH_PROJECT` in the Render dashboard.
+The included [render.yaml](./render.yaml) uses `backend` as the service root and binds
+Gunicorn to Render's `$PORT`. After deployment, verify `https://<render-service>/health`
+returns `{"status":"ok"}`.
+
+For the Vercel frontend, set `VITE_API_URL` to the deployed Render service URL and
+redeploy. A production build without this variable fails clearly instead of sending
+requests to the frontend host.
+
+### LangSmith tracing
+
+Each `/chat` request creates a `User Query Received` parent trace. The existing
+LangGraph nodes are instrumented as child spans for input validation, dataset schema
+generation, query/schema preparation, SQL validation, SQL execution, final answer
+generation, and response sanitization. Gemini's LangChain invocation remains nested
+inside the query-generation span and reports provider-supplied token usage when
+available. Costs are reported only when the optional per-million-token pricing
+environment variables are configured; otherwise the cost is `null`, not estimated.
+
+---
