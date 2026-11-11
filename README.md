@@ -81,6 +81,15 @@ For the Vercel frontend, set `VITE_API_URL` to the deployed Render service URL a
 redeploy. A production build without this variable fails clearly instead of sending
 requests to the frontend host.
 
+### Response feedback
+
+AI text responses expose upvote and downvote controls. Downvotes can include a
+reason and comment and are stored in the persistent SQLAlchemy `feedback` table.
+The default database is `backend/feedback.db`; set `FEEDBACK_DATABASE_URL` to
+use another SQLAlchemy database URL. Feedback updates the existing row for the
+same response and, when LangSmith is configured, is submitted as the
+`user_rating` feedback key against the returned trace ID.
+
 ### LangSmith tracing
 
 Each `/chat` request creates a `User Query Received` parent trace. The existing

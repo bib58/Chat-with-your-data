@@ -1,5 +1,5 @@
-from pydantic import BaseModel
-from typing import List, Optional, Any, Dict
+from pydantic import BaseModel, Field
+from typing import List, Optional, Any, Dict, Literal
 
 class ChatRequest(BaseModel):
     message: str
@@ -29,6 +29,8 @@ class TokenFinancials(BaseModel):
 
 class ChatResponse(BaseModel):
     answer: str
+    message_id: str
+    trace_id: Optional[str] = None
     table_data: Optional[List[Dict[str, Any]]] = None
     chart_config: Optional[ChartConfig] = None
     query_executed: Optional[str] = None
@@ -38,3 +40,13 @@ class ChatResponse(BaseModel):
 
 class CleanupRequest(BaseModel):
     dataset_path: str
+
+
+class FeedbackRequest(BaseModel):
+    message_id: str = Field(min_length=1, max_length=255)
+    trace_id: Optional[str] = None
+    rating: Literal[1, -1]
+    query: Optional[str] = None
+    response: Optional[str] = None
+    reason: Optional[str] = None
+    comment: Optional[str] = None

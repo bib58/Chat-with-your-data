@@ -3,6 +3,7 @@ from typing import TypedDict, Any, Optional, Dict, List
 from langgraph.graph import StateGraph, START, END
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage, SystemMessage
+from langsmith import get_current_run_tree
 from pydantic import BaseModel, Field
 import os
 import time
@@ -570,6 +571,7 @@ def process_chat(
     model_name: Optional[str] = None,
     request_id: str = "unknown",
     session_id: str = "unknown",
+    langsmith_extra: Optional[Dict[str, Any]] = None,
 ):
     execution_mode = "sql_server" if db_uri else "file_upload"
     initial_state = {
@@ -584,11 +586,18 @@ def process_chat(
         "sql_dialect": "tsql" if db_uri else "sqlite",
         "error": "",
     }
+    trace_config = {
+        "tags": ["chat", execution_mode, "text-to-sql"],
+        "metadata": trace_metadata(initial_state),
+    }
+    if langsmith_extra:
+        trace_config.update(langsmith_extra)
+
     result = app.invoke(
         initial_state,
-        config={
-            "tags": ["chat", execution_mode, "text-to-sql"],
-            "metadata": trace_metadata(initial_state),
-        },
+        config=trace_config,
     )
+    run_tree = get_current_run_tree()
+    if run_tree is not None:
+        result["trace_id"] = str(run_tree.id)
     return result

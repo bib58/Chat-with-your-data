@@ -1,6 +1,8 @@
 import { useState } from 'react';
-import { User, Code, BarChart3, Table as TableIcon, Copy, Check, Sparkles } from 'lucide-react';
+import axios from 'axios';
+import { User, Code, BarChart3, Table as TableIcon, Copy, Check, Sparkles, ThumbsUp, ThumbsDown, Loader2 } from 'lucide-react';
 import botImg from '../assets/bot.png';
+import { requireApiUrl } from '../config';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
@@ -11,6 +13,12 @@ export default function MessageBubble({ message }) {
   const isUser = message.role === 'user';
   const [copied, setCopied] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
+  const [feedbackRating, setFeedbackRating] = useState(null);
+  const [feedbackReason, setFeedbackReason] = useState('');
+  const [feedbackComment, setFeedbackComment] = useState('');
+  const [showFeedbackForm, setShowFeedbackForm] = useState(false);
+  const [feedbackStatus, setFeedbackStatus] = useState('');
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
 
   const handleCopy = async () => {
     let textToCopy = message.content || '';
@@ -63,6 +71,41 @@ export default function MessageBubble({ message }) {
       setTimeout(() => setCodeCopied(false), 2000);
     } catch (err) {
       console.error('Failed to copy code: ', err);
+    }
+  };
+
+  const submitFeedback = async (rating) => {
+    if (!message.message_id || isSubmittingFeedback) return;
+
+    setIsSubmittingFeedback(true);
+    setFeedbackStatus('');
+    try {
+      await axios.post(`${requireApiUrl()}/feedback`, {
+        message_id: message.message_id,
+        trace_id: message.trace_id,
+        rating,
+        query: message.query,
+        response: message.content,
+        reason: rating === -1 ? feedbackReason || null : null,
+        comment: rating === -1 ? feedbackComment.trim() || null : null
+      });
+      setFeedbackRating(rating);
+      setFeedbackStatus('Thanks for your feedback.');
+      if (rating === 1) {
+        setShowFeedbackForm(false);
+      }
+    } catch (error) {
+      console.error('Failed to save feedback:', error);
+      setFeedbackStatus(error.response?.data?.detail || 'Could not save feedback. Please try again.');
+    } finally {
+      setIsSubmittingFeedback(false);
+    }
+  };
+
+  const handleDownvote = () => {
+    setShowFeedbackForm(true);
+    if (feedbackRating !== -1) {
+      submitFeedback(-1);
     }
   };
 
@@ -252,6 +295,75 @@ export default function MessageBubble({ message }) {
                 {renderChart(message.config, message.data)}
               </ResponsiveContainer>
             </div>
+          </div>
+        )}
+
+        {!isUser && message.message_id && (
+          <div className="flex flex-col items-start gap-2 mt-1 print:hidden">
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => submitFeedback(1)}
+                disabled={isSubmittingFeedback}
+                aria-label="Helpful response"
+                title="Helpful"
+                className={`p-1.5 rounded-md transition-colors disabled:opacity-50 ${feedbackRating === 1
+                  ? 'text-emerald-400 bg-emerald-400/15'
+                  : 'text-slate-500 hover:text-emerald-400 hover:bg-slate-800'
+                }`}
+              >
+                {isSubmittingFeedback && feedbackRating !== 1 ? <Loader2 className="w-4 h-4 animate-spin" /> : <ThumbsUp className="w-4 h-4" />}
+              </button>
+              <button
+                type="button"
+                onClick={handleDownvote}
+                disabled={isSubmittingFeedback}
+                aria-label="Not helpful response"
+                title="Not helpful"
+                className={`p-1.5 rounded-md transition-colors disabled:opacity-50 ${feedbackRating === -1
+                  ? 'text-rose-400 bg-rose-400/15'
+                  : 'text-slate-500 hover:text-rose-400 hover:bg-slate-800'
+                }`}
+              >
+                <ThumbsDown className="w-4 h-4" />
+              </button>
+            </div>
+            {showFeedbackForm && (
+              <div className="w-full max-w-sm rounded-lg border border-slate-700/60 bg-slate-900/70 p-3 space-y-2">
+                <label className="block text-xs text-slate-400" htmlFor={`feedback-reason-${message.message_id}`}>
+                  What could be improved?
+                </label>
+                <select
+                  id={`feedback-reason-${message.message_id}`}
+                  value={feedbackReason}
+                  onChange={(event) => setFeedbackReason(event.target.value)}
+                  className="w-full rounded-md border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-indigo-400"
+                >
+                  <option value="">Select a reason (optional)</option>
+                  <option value="Incorrect answer">Incorrect answer</option>
+                  <option value="Wrong SQL query">Wrong SQL query</option>
+                  <option value="Irrelevant response">Irrelevant response</option>
+                  <option value="Incomplete explanation">Incomplete explanation</option>
+                  <option value="Other">Other</option>
+                </select>
+                <textarea
+                  value={feedbackComment}
+                  onChange={(event) => setFeedbackComment(event.target.value)}
+                  placeholder="Optional comment"
+                  rows={2}
+                  className="w-full resize-none rounded-md border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-slate-300 placeholder:text-slate-600 focus:outline-none focus:border-indigo-400"
+                />
+                <button
+                  type="button"
+                  onClick={() => submitFeedback(-1)}
+                  disabled={isSubmittingFeedback}
+                  className="rounded-md bg-indigo-600 px-2.5 py-1.5 text-xs text-white hover:bg-indigo-500 disabled:opacity-50"
+                >
+                  {isSubmittingFeedback ? 'Saving...' : feedbackRating === -1 ? 'Update feedback' : 'Save feedback'}
+                </button>
+              </div>
+            )}
+            {feedbackStatus && <span className="text-xs text-slate-400">{feedbackStatus}</span>}
           </div>
         )}
       </div>

@@ -10,11 +10,27 @@ from dotenv import load_dotenv
 load_dotenv()
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 try:
-    from .models import ChatRequest, ChatResponse, ChartConfig, ConnectRequest, CleanupRequest
+    from .models import (
+        ChatRequest,
+        ChatResponse,
+        ChartConfig,
+        ConnectRequest,
+        CleanupRequest,
+        FeedbackRequest,
+    )
     from .agent import process_chat
+    from .feedback_store import initialize_feedback_database, save_feedback, submit_langsmith_feedback
 except ImportError:
-    from models import ChatRequest, ChatResponse, ChartConfig, ConnectRequest, CleanupRequest
+    from models import (
+        ChatRequest,
+        ChatResponse,
+        ChartConfig,
+        ConnectRequest,
+        CleanupRequest,
+        FeedbackRequest,
+    )
     from agent import process_chat
+    from feedback_store import initialize_feedback_database, save_feedback, submit_langsmith_feedback
 
 app = FastAPI()
 
@@ -37,6 +53,7 @@ app.add_middleware(
 
 UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+initialize_feedback_database()
 
 @app.get("/health")
 async def health():
@@ -183,6 +200,8 @@ async def chat(request: ChatRequest):
         error_msg = result.get("final_answer") or f"Error: {result['error']}"
         return ChatResponse(
             answer=error_msg,
+            message_id=request_id,
+            trace_id=result.get("trace_id"),
             table_data=None,
             chart_config=None,
             query_executed=result.get("sql_query"),
@@ -198,6 +217,8 @@ async def chat(request: ChatRequest):
         )
         return ChatResponse(
             answer=answer_str,
+            message_id=request_id,
+            trace_id=result.get("trace_id"),
             table_data=None,
             chart_config=None,
             query_executed=None,
@@ -232,6 +253,8 @@ async def chat(request: ChatRequest):
 
     return ChatResponse(
         answer=answer_str,
+        message_id=request_id,
+        trace_id=result.get("trace_id"),
         table_data=table_data,
         chart_config=chart_cfg,
         query_executed=result.get("sql_query"),
@@ -239,3 +262,29 @@ async def chat(request: ChatRequest):
         token_financials=result.get("token_financials"),
         reasoning_content=result.get("reasoning_content")
     )
+
+
+@app.post("/feedback")
+async def feedback(request: FeedbackRequest):
+    if not request.message_id.strip():
+        raise HTTPException(status_code=422, detail="message_id is required.")
+
+    try:
+        saved = save_feedback(
+            message_id=request.message_id.strip(),
+            trace_id=request.trace_id,
+            rating=request.rating,
+            query=request.query,
+            response=request.response,
+            reason=request.reason,
+            comment=request.comment,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail="Unable to save feedback.") from exc
+
+    submit_langsmith_feedback(request.trace_id, request.rating, request.reason, request.comment)
+    return {
+        "status": "saved",
+        "message_id": saved.message_id,
+        "rating": saved.rating,
+    }

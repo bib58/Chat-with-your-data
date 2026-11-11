@@ -1,7 +1,46 @@
-@"
+# Secrets
 .env
-backend/.env
-node_modules/
-backend/__pycache__/
+.env.*
+!.env.example
+
+# Python environment and cache
+venv/
+.venv/
 __pycache__/
-"@ | Out-File -Encoding utf8 .gitignore
+*.py[cod]
+.pytest_cache/
+
+# Node dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Local feedback database
+backend/feedback.db
+*.sqlite
+*.sqlite3
+
+# User-uploaded datasets
+backend/uploads/*
+!backend/uploads/.gitkeep
+backend/feedback.db
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+# SQLite runtime files
+*.db
+*.db-wal
+*.db-shm
+*.sqlite-journal
+
+# Python test and tooling cache
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
