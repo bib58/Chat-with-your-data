@@ -3,7 +3,7 @@ import os
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import DateTime, Integer, String, Text, create_engine
+from sqlalchemy import DateTime, Integer, String, Text, UniqueConstraint, create_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
 logger = logging.getLogger(__name__)
@@ -13,83 +13,97 @@ class Base(DeclarativeBase):
     pass
 
 
-class Feedback(Base):
-    __tablename__ = "feedback"
+class UserFeedback(Base):
+    __tablename__ = "user_feedback"
+    __table_args__ = (UniqueConstraint("message_id", name="uq_user_feedback_message_id"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    message_id: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
-    trace_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    query: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    response: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    rating: Mapped[int] = mapped_column(Integer, nullable=False)
-    reason: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    comment: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    question: Mapped[str] = mapped_column(Text, nullable=False)
+    answer: Mapped[str] = mapped_column(Text, nullable=False)
+    session_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+    message_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    feedback_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    feedback_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
-def _database_url() -> str:
-    default_path = os.path.join(os.path.dirname(__file__), "feedback.db")
-    configured_url = os.getenv("FEEDBACK_DATABASE_URL", "").strip()
-    return configured_url or f"sqlite:///{default_path}"
+def _database_url() -> Optional[str]:
+    configured_url = os.getenv("DATABASE_URL", "").strip()
+    if not configured_url:
+        return None
+    if configured_url.startswith("postgres://"):
+        return "postgresql+psycopg://" + configured_url[len("postgres://"):]
+    if configured_url.startswith("postgresql://"):
+        return "postgresql+psycopg://" + configured_url[len("postgresql://"):]
+    return configured_url
 
 
-engine = create_engine(
-    _database_url(),
-    connect_args={"check_same_thread": False} if _database_url().startswith("sqlite") else {},
-)
-SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
+engine = None
+SessionLocal = None
 
 
-def initialize_feedback_database() -> None:
-    Base.metadata.create_all(bind=engine)
+def _get_session_factory():
+    global engine, SessionLocal
+    if SessionLocal is not None:
+        return SessionLocal
+
+    database_url = _database_url()
+    if not database_url:
+        raise RuntimeError("DATABASE_URL is not configured.")
+
+    try:
+        engine = create_engine(database_url, pool_pre_ping=True)
+        SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
+        return SessionLocal
+    except Exception as exc:
+        logger.error("Unable to configure the Neon feedback database.")
+        raise RuntimeError("Unable to configure the Neon feedback database.") from exc
+
+
+def initialize_feedback_database() -> bool:
+    if not _database_url():
+        logger.warning("DATABASE_URL is not configured; feedback storage is disabled.")
+        return False
+
+    try:
+        session_factory = _get_session_factory()
+        Base.metadata.create_all(bind=session_factory.kw["bind"])
+        return True
+    except Exception:
+        logger.error("Unable to initialize the Neon feedback database.")
+        return False
 
 
 def save_feedback(
     *,
+    question: str,
+    answer: str,
+    session_id: Optional[str],
     message_id: str,
-    trace_id: Optional[str],
-    rating: int,
-    query: Optional[str],
-    response: Optional[str],
-    reason: Optional[str],
-    comment: Optional[str],
-) -> Feedback:
+    feedback_type: str,
+    feedback_reason: Optional[str],
+) -> UserFeedback:
     now = datetime.now(timezone.utc)
-    with SessionLocal() as session:
-        feedback = session.query(Feedback).filter_by(message_id=message_id).one_or_none()
+    session_factory = _get_session_factory()
+    with session_factory() as session:
+        feedback = session.query(UserFeedback).filter_by(message_id=message_id).one_or_none()
         if feedback is None:
-            feedback = Feedback(
+            feedback = UserFeedback(
+                question=question,
+                answer=answer,
+                session_id=session_id,
                 message_id=message_id,
+                feedback_type=feedback_type,
+                feedback_reason=feedback_reason,
                 created_at=now,
             )
             session.add(feedback)
-
-        feedback.trace_id = trace_id
-        feedback.query = query
-        feedback.response = response
-        feedback.rating = rating
-        feedback.reason = reason
-        feedback.comment = comment
-        feedback.updated_at = now
+        else:
+            feedback.question = question
+            feedback.answer = answer
+            feedback.session_id = session_id
+            feedback.feedback_type = feedback_type
+            feedback.feedback_reason = feedback_reason
         session.commit()
         session.refresh(feedback)
         return feedback
-
-
-def submit_langsmith_feedback(trace_id: Optional[str], rating: int, reason: Optional[str], comment: Optional[str]) -> None:
-    if not trace_id or not os.getenv("LANGSMITH_API_KEY"):
-        return
-
-    try:
-        from langsmith import Client
-
-        Client().create_feedback(
-            run_id=trace_id,
-            key="user_rating",
-            score=1 if rating == 1 else 0,
-            comment=comment,
-            extra={"reason": reason} if reason else None,
-        )
-    except Exception:
-        logger.warning("LangSmith feedback submission failed for trace %s", trace_id, exc_info=True)

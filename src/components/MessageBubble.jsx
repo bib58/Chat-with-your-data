@@ -75,19 +75,25 @@ export default function MessageBubble({ message }) {
   };
 
   const submitFeedback = async (rating) => {
-    if (!message.message_id || isSubmittingFeedback) return;
+    if (
+      !message.message_id ||
+      isSubmittingFeedback ||
+      (feedbackRating === rating && !(rating === -1 && showFeedbackForm))
+    ) return;
 
     setIsSubmittingFeedback(true);
     setFeedbackStatus('');
     try {
+      const feedbackReasonValue = [rating === -1 ? feedbackReason : null, rating === -1 ? feedbackComment.trim() : null]
+        .filter(Boolean)
+        .join(': ') || null;
       await axios.post(`${requireApiUrl()}/feedback`, {
+        question: message.question,
+        answer: message.content,
+        session_id: message.session_id,
         message_id: message.message_id,
-        trace_id: message.trace_id,
-        rating,
-        query: message.query,
-        response: message.content,
-        reason: rating === -1 ? feedbackReason || null : null,
-        comment: rating === -1 ? feedbackComment.trim() || null : null
+        feedback_type: rating === 1 ? 'upvote' : 'downvote',
+        feedback_reason: feedbackReasonValue
       });
       setFeedbackRating(rating);
       setFeedbackStatus('Thanks for your feedback.');
@@ -104,7 +110,7 @@ export default function MessageBubble({ message }) {
 
   const handleDownvote = () => {
     setShowFeedbackForm(true);
-    if (feedbackRating !== -1) {
+    if (feedbackRating !== -1 && !isSubmittingFeedback) {
       submitFeedback(-1);
     }
   };

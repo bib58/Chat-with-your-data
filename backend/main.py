@@ -4,11 +4,14 @@ from pydantic import BaseModel
 import shutil
 import os
 import uuid
+import logging
 from typing import List, Dict, Any
 from dotenv import load_dotenv
+from sqlalchemy.exc import SQLAlchemyError
 
 load_dotenv()
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
+logger = logging.getLogger(__name__)
 try:
     from .models import (
         ChatRequest,
@@ -19,7 +22,7 @@ try:
         FeedbackRequest,
     )
     from .agent import process_chat
-    from .feedback_store import initialize_feedback_database, save_feedback, submit_langsmith_feedback
+    from .feedback_store import initialize_feedback_database, save_feedback
 except ImportError:
     from models import (
         ChatRequest,
@@ -30,7 +33,7 @@ except ImportError:
         FeedbackRequest,
     )
     from agent import process_chat
-    from feedback_store import initialize_feedback_database, save_feedback, submit_langsmith_feedback
+    from feedback_store import initialize_feedback_database, save_feedback
 
 app = FastAPI()
 
@@ -266,25 +269,32 @@ async def chat(request: ChatRequest):
 
 @app.post("/feedback")
 async def feedback(request: FeedbackRequest):
-    if not request.message_id.strip():
-        raise HTTPException(status_code=422, detail="message_id is required.")
+    question = request.question.strip()
+    answer = request.answer.strip()
+    message_id = request.message_id.strip()
+    if not question or not answer or not message_id:
+        raise HTTPException(status_code=422, detail="question, answer, and message_id are required.")
 
     try:
         saved = save_feedback(
-            message_id=request.message_id.strip(),
-            trace_id=request.trace_id,
-            rating=request.rating,
-            query=request.query,
-            response=request.response,
-            reason=request.reason,
-            comment=request.comment,
+            question=question,
+            answer=answer,
+            session_id=request.session_id.strip() if request.session_id else None,
+            message_id=message_id,
+            feedback_type=request.feedback_type,
+            feedback_reason=request.feedback_reason.strip() if request.feedback_reason else None,
         )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except SQLAlchemyError as exc:
+        logger.error("Feedback database operation failed.")
+        raise HTTPException(status_code=503, detail="Feedback storage is currently unavailable.") from exc
     except Exception as exc:
-        raise HTTPException(status_code=500, detail="Unable to save feedback.") from exc
+        logger.error("Feedback submission failed.")
+        raise HTTPException(status_code=500, detail="Unable to save feedback right now.") from exc
 
-    submit_langsmith_feedback(request.trace_id, request.rating, request.reason, request.comment)
     return {
         "status": "saved",
         "message_id": saved.message_id,
-        "rating": saved.rating,
+        "feedback_type": saved.feedback_type,
     }

@@ -72,7 +72,9 @@ Copy [.env.example](./.env.example) to a local environment file for development.
 commit `.env` files or API keys.
 
 For the Render backend, set `GOOGLE_API_KEY`, `CORS_ORIGINS` (including the deployed
-frontend origin), `LANGSMITH_API_KEY`, and `LANGSMITH_PROJECT` in the Render dashboard.
+frontend origin), `LANGSMITH_API_KEY`, `LANGSMITH_PROJECT`, and `DATABASE_URL` in the
+Render dashboard. `DATABASE_URL` must be the Neon PostgreSQL connection string and must
+remain backend-only; never expose it through Vite or commit it to `.env`.
 The included [render.yaml](./render.yaml) uses `backend` as the service root and binds
 Gunicorn to Render's `$PORT`. After deployment, verify `https://<render-service>/health`
 returns `{"status":"ok"}`.
@@ -83,12 +85,17 @@ requests to the frontend host.
 
 ### Response feedback
 
-AI text responses expose upvote and downvote controls. Downvotes can include a
-reason and comment and are stored in the persistent SQLAlchemy `feedback` table.
-The default database is `backend/feedback.db`; set `FEEDBACK_DATABASE_URL` to
-use another SQLAlchemy database URL. Feedback updates the existing row for the
-same response and, when LangSmith is configured, is submitted as the
-`user_rating` feedback key against the returned trace ID.
+AI text responses expose upvote and downvote controls. Feedback is stored in Neon
+PostgreSQL in the `user_feedback` table, with one upserted row per `message_id`.
+The backend creates the table on startup when `DATABASE_URL` is configured. The
+`POST /feedback` endpoint accepts the question, answer, session ID, message ID,
+`feedback_type` (`upvote` or `downvote`), and an optional `feedback_reason`.
+Feedback storage failures return a clear API error without interrupting chat.
+
+To configure Neon locally, copy [.env.example](./.env.example) to `.env`, replace
+the placeholder `DATABASE_URL` with the connection string from the Neon dashboard,
+and start the backend. The existing SQLite databases used for uploaded datasets
+remain unchanged.
 
 ### LangSmith tracing
 

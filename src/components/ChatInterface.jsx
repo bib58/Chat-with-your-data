@@ -61,6 +61,8 @@ export default function ChatInterface({ dataset, onOpenSidebar }) {
           content: data.answer,
           type: 'text',
           query: data.query_executed,
+          question: userMessage,
+          session_id: 'default',
           token_financials: data.token_financials,
           message_id: data.message_id,
           trace_id: data.trace_id

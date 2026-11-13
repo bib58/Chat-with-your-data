@@ -10,6 +10,7 @@ reportlab
 python-dotenv
 openpyxl
 sqlalchemy
+psycopg[binary]
 langchain-community
 pymssql
 sqlglot

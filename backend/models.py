@@ -43,10 +43,9 @@ class CleanupRequest(BaseModel):
 
 
 class FeedbackRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=10000)
+    answer: str = Field(min_length=1, max_length=100000)
+    session_id: Optional[str] = Field(default=None, max_length=255)
     message_id: str = Field(min_length=1, max_length=255)
-    trace_id: Optional[str] = None
-    rating: Literal[1, -1]
-    query: Optional[str] = None
-    response: Optional[str] = None
-    reason: Optional[str] = None
-    comment: Optional[str] = None
+    feedback_type: Literal["upvote", "downvote"]
+    feedback_reason: Optional[str] = Field(default=None, max_length=2000)
